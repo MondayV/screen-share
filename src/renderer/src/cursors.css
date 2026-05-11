@@ -1,0 +1,73 @@
+html,
+body {
+  overflow: hidden;
+}
+.cursor {
+  display: block;
+  position: absolute;
+  width: 24px;
+  height: 24px;
+}
+
+.cursor .name {
+  display: block;
+  text-shadow: '-1px 0 black, 0 1px black, 1px 0 black, 0 -1px black';
+  color: var(--name-color);
+}
+
+.cursor svg {
+  max-width: 24px;
+  fill: var(--cursor-color);
+}
+
+.is-hidden {
+  display: none !important;
+}
+
+.cursor .ping {
+  width: 48px;
+  height: 48px;
+  border: 5px solid var(--ping-color);
+  border-radius: 50%;
+  display: inline-block;
+  box-sizing: border-box;
+  position: absolute;
+  top: -12px;
+  left: -12px;
+  animation: pulse 1s linear infinite;
+}
+
+.cursor .ping:after {
+  content: '';
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  border: 5px solid var(--ping-color);
+  border-radius: 50%;
+  display: inline-block;
+  box-sizing: border-box;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  animation: scaleUp 1s linear infinite;
+}
+
+@keyframes scaleUp {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+  }
+  60%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+@keyframes pulse {
+  0%,
+  60%,
+  100% {
+    transform: scale(1);
+  }
+  80% {
+    transform: scale(1.2);
+  }
+}

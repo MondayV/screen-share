@@ -1,0 +1,58 @@
+[
+  {
+    "title": "Electron",
+    "url": "https://www.electronjs.org/",
+    "license": "MIT",
+    "description": "使用 JavaScript、HTML 和 CSS 构建跨平台桌面应用程序",
+    "usage": "应用程序框架"
+  },
+  {
+    "title": "Svelte",
+    "url": "https://svelte.dev/",
+    "license": "MIT",
+    "description": "编译型前端 UI 框架",
+    "usage": "用户界面渲染"
+  },
+  {
+    "title": "Bulma",
+    "url": "https://bulma.io/",
+    "license": "MIT",
+    "description": "基于 Flexbox 的现代 CSS 框架",
+    "usage": "UI 样式"
+  },
+  {
+    "title": "WebRTC",
+    "url": "https://webrtc.org/",
+    "license": "BSD",
+    "description": "浏览器实时通信技术",
+    "usage": "点对点屏幕共享"
+  },
+  {
+    "title": "SweetAlert2",
+    "url": "https://sweetalert2.github.io/",
+    "license": "MIT",
+    "description": "美观的弹窗提示库",
+    "usage": "用户通知"
+  },
+  {
+    "title": "Font Awesome",
+    "url": "https://fontawesome.com/",
+    "license": "SIL OFL 1.1 / MIT",
+    "description": "图标字体和 CSS 框架",
+    "usage": "界面图标"
+  },
+  {
+    "title": "typesafe-i18n",
+    "url": "https://github.com/ivanhofer/typesafe-i18n",
+    "license": "MIT",
+    "description": "类型安全的国际化库",
+    "usage": "多语言支持"
+  },
+  {
+    "title": "svelte-awesome-color-picker",
+    "url": "https://github.com/mskocik/svelte-awesome-color-picker",
+    "license": "MIT",
+    "description": "Svelte 颜色选择器组件",
+    "usage": "颜色选择"
+  }
+]
