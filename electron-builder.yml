@@ -1,0 +1,35 @@
+appId: net.getpcconnect
+productName: PC Connect
+directories:
+  buildResources: build
+  output: release
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.*'
+  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml}'
+  - '!{.typesafe-i18n.json,svelte.config.mjs,tsconfig.json,tsconfig.node.json}'
+  - '!{.claude,screenshots,.github}'
+  - '!dev-app-update.yml'
+win:
+  executableName: PCConnect
+  icon: build/icon.ico
+  target:
+    - nsis
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
+  shortcutName: PC Connect
+  uninstallDisplayName: PC Connect
+  createDesktopShortcut: always
+mac:
+  entitlementsInherit: build/entitlements.mac.plist
+  icon: build/icon.icns
+  target:
+    - dmg
+linux:
+  icon: build/icon.png
+  target:
+    - AppImage
+    - deb
+  maintainer: PC Connect
+  category: Utility

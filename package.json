@@ -12,7 +12,10 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "translations": "typesafe-i18n --no-watch",
-    "translations:watch": "typesafe-i18n"
+    "translations:watch": "typesafe-i18n",
+    "build:win": "electron-vite build && electron-builder --win --publish never",
+    "build:mac": "electron-vite build && electron-builder --mac --publish never",
+    "build:linux": "electron-vite build && electron-builder --linux --publish never"
   },
   "dependencies": {
     "@electron-toolkit/preload": "3.0.1",
@@ -28,6 +31,7 @@
     "@sveltejs/vite-plugin-svelte": "3.1.2",
     "bulma": "1.0.2",
     "electron": "^31.0.2",
+    "electron-builder": "^26.8.1",
     "electron-vite": "^2.3.0",
     "svelte": "4.2.19",
     "svelte-awesome-color-picker": "3.1.4",
