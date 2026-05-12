@@ -22,6 +22,10 @@ npm run dev
 npm run build
 ```
 
+## 下载
+
+前往 [Releases 页面](https://github.com/MondayV/screen-share/releases) 下载最新版本。
+
 ## 技术栈
 
 - Electron - 跨平台桌面框架
