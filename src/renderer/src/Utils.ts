@@ -5,11 +5,14 @@ export const enum ConnectionType {
 
 export type RTCSessionDescriptionOptions = RTCSessionDescriptionInit
 
+// Configurable signaling server URL (change for production)
+let SIGNAL_SERVER = 'http://localhost:3456'
+export const setSignalServer = (url: string) => { SIGNAL_SERVER = url }
+export const getSignalServer = () => SIGNAL_SERVER
+
 export const externalLinkClickHandler = (root: HTMLButtonElement, url: string): void => {
   root.classList.add('is-loading')
-  setTimeout(() => {
-    root.classList.remove('is-loading')
-  }, 3000)
+  setTimeout(() => { root.classList.remove('is-loading') }, 3000)
   window.open(url)
 }
 
@@ -106,6 +109,42 @@ export const getDataFromPcConnectUrl = async (
     rtcSessionDescription: raw.d
   }
 }
+
+// Server-based short code exchange (6-char codes, under 20 chars total)
+export const hostToServer = async (desc: RTCSessionDescriptionInit, username: string): Promise<string> => {
+  const res = await fetch(`${SIGNAL_SERVER}/host`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sdp: desc, username })
+  })
+  if (!res.ok) throw new Error('信令服务器连接失败')
+  const { code } = await res.json()
+  return code
+}
+
+export const getOfferFromServer = async (code: string): Promise<{ sdp: RTCSessionDescriptionInit; username: string }> => {
+  const res = await fetch(`${SIGNAL_SERVER}/offer/${code.toUpperCase()}`)
+  if (!res.ok) throw new Error('连接码无效或已过期')
+  return res.json()
+}
+
+export const sendAnswerToServer = async (code: string, desc: RTCSessionDescriptionInit, username: string): Promise<void> => {
+  await fetch(`${SIGNAL_SERVER}/answer/${code.toUpperCase()}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sdp: desc, username })
+  })
+}
+
+export const pollAnswerFromServer = async (code: string): Promise<{ ready: boolean; sdp?: RTCSessionDescriptionInit; username?: string }> => {
+  const res = await fetch(`${SIGNAL_SERVER}/answer/${code.toUpperCase()}`)
+  if (!res.ok) throw new Error('连接码无效或已过期')
+  return res.json()
+}
+
+export const mayBeShortCode = (str: string): boolean => /^[A-Za-z0-9]{4,8}$/.test(str.trim())
+
+export const getShortLink = (code: string): string => `pc://${code.toUpperCase()}`
 
 export const makeVideoDraggable = (video: HTMLVideoElement): void => {
   let startX: number, startY: number, initialX: number, initialY: number, isDragging = false

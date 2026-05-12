@@ -166,6 +166,15 @@
     }
     return await getConnectionString(ConnectionType.PARTICIPANT, pc.localDescription, data)
   }
+  export async function CreateHostOffer(): Promise<RTCSessionDescriptionOptions> {
+    remoteMouseCursorPositionsChannel = pc.createDataChannel('remoteMouseCursorPositions')
+    remoteCursorPingChannel = pc.createDataChannel('remoteCursorPing')
+    setupDataChannel(remoteMouseCursorPositionsChannel)
+    setupDataChannel(remoteCursorPingChannel)
+    const desc = await pc.createOffer()
+    await pc.setLocalDescription(desc)
+    return pc.localDescription.toJSON() as RTCSessionDescriptionOptions
+  }
   export async function CreateHostUrl(data: { username: string }): Promise<string> {
     remoteMouseCursorPositionsChannel = pc.createDataChannel('remoteMouseCursorPositions')
     remoteCursorPingChannel = pc.createDataChannel('remoteCursorPing')
@@ -196,6 +205,23 @@
       }
     }
     return false
+  }
+  export function GetLocalDescription(): RTCSessionDescriptionOptions | null {
+    return pc ? pc.localDescription?.toJSON() as RTCSessionDescriptionOptions : null
+  }
+  export async function ConnectAndGetAnswer(c: RTCSessionDescriptionOptions): Promise<RTCSessionDescriptionOptions> {
+    try {
+      const desc = new RTCSessionDescription(c)
+      await pc.setRemoteDescription(desc)
+      if (desc.type === 'offer') {
+        const answer = await pc.createAnswer()
+        await pc.setLocalDescription(answer)
+      }
+      return pc.localDescription.toJSON() as RTCSessionDescriptionOptions
+    } catch (e) {
+      errorHander(e)
+      throw e
+    }
   }
   export async function Connect(c: RTCSessionDescriptionOptions): Promise<void> {
     try {

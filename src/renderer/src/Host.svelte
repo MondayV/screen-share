@@ -3,7 +3,9 @@
   import Swal from 'sweetalert2'
   import { L } from './translations'
   import { useNavigationEnabled, useIsHosting, useHostUrl } from './stores'
-  import { mayBeConnectionString, getDataFromPcConnectUrl, ConnectionType } from './Utils'
+  import {
+    mayBeShortCode, hostToServer, pollAnswerFromServer, debounce
+  } from './Utils'
   import AudioVisualizer from './AudioVisualizer.svelte'
   import WebRTC from './WebRTC.svelte'
 
@@ -11,8 +13,7 @@
   const isHosting = useIsHosting()
 
   let webRTCComponent: WebRTC
-  let connectButton: HTMLButtonElement
-  let copyButton: HTMLButtonElement
+  let connectionString = useHostUrl()
 
   let connectionState = 'disconnected'
   let cursorsActive = false
@@ -20,24 +21,11 @@
   let microphoneActive = false
   let isStreaming = false
   let sessionStarted = false
-  let connectionStringIsValid: boolean | null = null
-  let connectToUserName = ''
-  let copyButtonIsLoading = false
-  let connectionString = useHostUrl()
+  let shortCode = ''
+  let connectingParticipant = false
   let hasAudioInput = false
-  let visualizerIsActive: boolean = true
-
-  const onConnectionStringChange = async (): Promise<void> => {
-    if ($connectionString === '') {
-      connectionStringIsValid = null
-      return
-    }
-    connectionStringIsValid = mayBeConnectionString(ConnectionType.PARTICIPANT, $connectionString)
-    if (connectionStringIsValid) {
-      const data = await getDataFromPcConnectUrl($connectionString)
-      connectToUserName = data.data.username
-    }
-  }
+  let visualizerIsActive = true
+  let pollingTimer: ReturnType<typeof setInterval> | null = null
 
   const onConnectionStateChange = (): void => {
     switch (connectionState) {
@@ -49,29 +37,28 @@
           showConfirmButton: false,
           timer: 1500
         })
+        connectingParticipant = false
+        isStreaming = true
+        if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null }
         break
       case 'failed':
-        Swal.fire({
-          position: 'top-end',
-          icon: 'error',
-          title: '连接失败',
-          showConfirmButton: false,
-          timer: 1500
-        })
+        Swal.fire({ position: 'top-end', icon: 'error', title: '连接失败', showConfirmButton: false, timer: 1500 })
+        connectingParticipant = false
+        if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null }
         break
       case 'closed':
         Swal.fire({
-          position: 'top-end',
+          position: 'center',
           icon: 'info',
-          title: '连接已关闭',
-          showConfirmButton: false,
-          timer: 1500
-        })
+          title: '共享已结束',
+          text: '对方已断开连接',
+          confirmButtonText: '返回',
+          allowOutsideClick: false
+        }).then(() => { reset() })
         break
     }
   }
 
-  $: $connectionString, onConnectionStringChange()
   $: connectionState, onConnectionStateChange()
 
   const toggleRemoteCursors = (): void => {
@@ -83,50 +70,72 @@
   onMount(async () => {
     const settings = await window.PcConnectApi.getSettings()
     microphoneActive = settings.isMicrophoneEnabledOnConnect
-    connectButton.addEventListener('click', async () => {
-      const data = await getDataFromPcConnectUrl($connectionString)
-      await webRTCComponent.Connect(data.rtcSessionDescription)
-      isStreaming = true
-      displayStreamActive = true
-    })
-    copyButton.addEventListener('click', async () => {
-      copyButtonIsLoading = true
-      const offer = await webRTCComponent.CreateHostUrl({
-        username: settings.username
-      })
-      navigator.clipboard.writeText(offer)
-      setTimeout(() => {
-        copyButtonIsLoading = false
-      }, 400)
-    })
   })
+
   const onStartSessionButtonClick = async (): Promise<void> => {
     await webRTCComponent.Setup()
     sessionStarted = true
     $navigationEnabled = false
     $isHosting = true
     hasAudioInput = webRTCComponent.HasAudioInput()
+
+    // Register with signaling server to get short code
+    try {
+      const desc = await webRTCComponent.CreateHostOffer()
+      if (desc) {
+        const code = await hostToServer(desc, (await window.PcConnectApi.getSettings()).username)
+        shortCode = code
+        $connectionString = code
+
+        // Poll for participant's answer
+        pollingTimer = setInterval(async () => {
+          try {
+            const result = await pollAnswerFromServer(code)
+            if (result.ready && result.sdp) {
+              if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null }
+              connectingParticipant = true
+              await webRTCComponent.Connect(result.sdp)
+            }
+          } catch { /* keep polling */ }
+        }, 2000)
+      }
+    } catch (e) {
+      Swal.fire({ icon: 'error', title: '无法连接信令服务器', text: '请确认服务器已启动' })
+      console.error(e)
+    }
   }
+
   const reset = (): void => {
+    if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null }
     $connectionString = ''
+    shortCode = ''
     cursorsActive = false
     displayStreamActive = false
     microphoneActive = true
     isStreaming = false
     sessionStarted = false
-    connectionStringIsValid = null
-    copyButtonIsLoading = false
+    connectingParticipant = false
     $navigationEnabled = true
     $isHosting = false
   }
+
   const onDisconnectClick = async (): Promise<void> => {
     await webRTCComponent.Disconnect()
-    reset()
+    Swal.fire({
+      position: 'center',
+      icon: 'info',
+      title: '共享已结束',
+      text: '连接已断开',
+      confirmButtonText: '确定',
+      allowOutsideClick: false
+    }).then(() => { reset() })
   }
+
   const onMicrophoneToggle = async (): Promise<void> => {
     microphoneActive = !microphoneActive
     webRTCComponent.ToggleMicrophone()
   }
+
   const onDisplayStreamToggle = async (): Promise<void> => {
     displayStreamActive = !displayStreamActive
     webRTCComponent.ToggleDisplayStream()
@@ -145,120 +154,80 @@
 
   <!-- Streaming controls -->
   <div class={!isStreaming ? 'is-hidden' : ''}>
-    <div class="fixed-grid">
-      <div class="grid">
-        <div class="cell">
-          <button
-            title={displayStreamActive ? L.streaming_your_display() : L.not_streaming_your_display()}
-            class="button {displayStreamActive ? 'is-success' : 'is-danger'}"
-            on:click={onDisplayStreamToggle}
-          >
-            <span class="icon"><i class="fa-solid fa-display"></i></span>
-          </button>
-          {#if hasAudioInput}
-            <button
-              title={microphoneActive ? L.microphone_active() : L.microphone_inactive()}
-              class="button {microphoneActive ? 'is-success' : 'is-danger'}"
-              on:click={onMicrophoneToggle}
-            >
-              <span class="icon">
-                {#if microphoneActive}
-                  <AudioVisualizer
-                    className="icon {!visualizerIsActive ? 'is-hidden' : ''}"
-                    bind:visualizerIsActive
-                    stream={webRTCComponent.GetAudioStream()}
-                  />
-                  <i class="fas fa-microphone {visualizerIsActive ? 'is-hidden' : ''}"></i>
-                {:else}
-                  <i class="fas fa-microphone-slash"></i>
-                {/if}
-              </span>
-            </button>
-          {/if}
-          <button
-            title={cursorsActive ? L.remote_cursors_enabled() : L.remote_cursors_disabled()}
-            class="button {cursorsActive ? 'is-success' : 'is-danger'} {!displayStreamActive ? 'is-hidden' : ''}"
-            on:click={toggleRemoteCursors}
-          >
-            <span class="icon"><i class="fas fa-mouse-pointer"></i></span>
-          </button>
-        </div>
-        <div class="cell has-text-right">
-          <button class="button is-danger" on:click={onDisconnectClick}>
-            <span class="icon"><i class="fas fa-unlink"></i></span>
-            <span>{L.disconnect()}</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="fixed-grid has-2-cols">
-    <div class="grid">
-      <!-- Start session button (visible before session) -->
-      <div class="cell {sessionStarted ? 'is-hidden' : ''}">
-        <button class="button is-link" disabled={sessionStarted} on:click={onStartSessionButtonClick}>
-          <span class="icon"><i class="fas fa-play"></i></span>
-          <span>{L.start_a_new_session()}</span>
-        </button>
-      </div>
-
-      <!-- After session started: show controls -->
-      <div class="cell {!sessionStarted || isStreaming ? 'is-hidden' : ''}">
-        <button class="button is-link {copyButtonIsLoading ? 'is-loading' : ''}" bind:this={copyButton}>
-          <span class="icon"><i class="fas fa-copy"></i></span>
-          <span>{L.copy_my_connection_string()}</span>
-        </button>
-      </div>
-
-      <div class="cell {!sessionStarted || isStreaming ? 'is-hidden' : ''}">
-        <button class="button is-danger" on:click={onDisconnectClick}>
-          <span class="icon"><i class="fas fa-unlink"></i></span>
-          <span>{L.cancel()}</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Participant connection input (after session started, before streaming) -->
-    <div class="cell {!sessionStarted || isStreaming ? 'is-hidden' : ''}">
-      <div class="field has-addons">
-        <div class="control has-icons-left has-icons-right">
-          <input
-            bind:value={$connectionString}
-            placeholder="输入参与者的连接码"
-            class="input {connectionStringIsValid === null
-              ? ''
-              : connectionStringIsValid ? 'is-success' : 'is-danger'}"
-            type="text"
-          />
-          <span class="icon is-small is-left"><i class="fas fa-user"></i></span>
-          <span class="icon is-small is-right">
-            <i class="fas {connectionStringIsValid === null
-              ? 'fa-question'
-              : connectionStringIsValid ? 'fa-check' : 'fa-times'}"></i>
+    <div class="mb-4">
+      <button
+        title={displayStreamActive ? L.streaming_your_display() : L.not_streaming_your_display()}
+        class="button {displayStreamActive ? 'is-success' : 'is-danger'} mr-2"
+        on:click={onDisplayStreamToggle}
+      >
+        <span class="icon"><i class="fa-solid fa-display"></i></span>
+      </button>
+      {#if hasAudioInput}
+        <button
+          title={microphoneActive ? L.microphone_active() : L.microphone_inactive()}
+          class="button {microphoneActive ? 'is-success' : 'is-danger'} mr-2"
+          on:click={onMicrophoneToggle}
+        >
+          <span class="icon">
+            {#if microphoneActive}
+              <AudioVisualizer
+                className="icon {!visualizerIsActive ? 'is-hidden' : ''}"
+                bind:visualizerIsActive
+                stream={webRTCComponent.GetAudioStream()}
+              />
+              <i class="fas fa-microphone {visualizerIsActive ? 'is-hidden' : ''}"></i>
+            {:else}
+              <i class="fas fa-microphone-slash"></i>
+            {/if}
           </span>
-        </div>
-        <div class="control">
-          <button
-            class="button {connectionStringIsValid === null
-              ? 'is-link'
-              : connectionStringIsValid ? 'is-success' : 'is-danger'}"
-            bind:this={connectButton}
-            disabled={!connectionStringIsValid}
-          >
-            <span class="icon"><i class="fas fa-link"></i></span>
-            <span>{L.connect()} {connectionStringIsValid ? connectToUserName : ''}</span>
-          </button>
-        </div>
-      </div>
+        </button>
+      {/if}
+      <button
+        title={cursorsActive ? L.remote_cursors_enabled() : L.remote_cursors_disabled()}
+        class="button {cursorsActive ? 'is-success' : 'is-danger'} mr-2 {!displayStreamActive ? 'is-hidden' : ''}"
+        on:click={toggleRemoteCursors}
+      >
+        <span class="icon"><i class="fas fa-mouse-pointer"></i></span>
+      </button>
+      <button class="button is-danger" on:click={onDisconnectClick}>
+        <span class="icon"><i class="fas fa-unlink"></i></span>
+        <span>{L.disconnect()}</span>
+      </button>
     </div>
   </div>
 
-  <!-- Status message when session is ready but not yet streaming -->
-  <div class={sessionStarted && !isStreaming ? '' : 'is-hidden'}>
-    <div class="notification is-info">
-      <p><strong>共享已准备就绪</strong> — 复制连接码发送给对方，等待对方连接。</p>
-      <p class="is-size-7 mt-2">对方连接后，在此输入对方返回的连接码以完成连接。</p>
-    </div>
+  <!-- Pre-session: Start button -->
+  <div class={sessionStarted ? 'is-hidden' : ''}>
+    <button class="button is-link is-medium" on:click={onStartSessionButtonClick}>
+      <span class="icon"><i class="fas fa-play"></i></span>
+      <span>{L.start_a_new_session()}</span>
+    </button>
+  </div>
+
+  <!-- Session ready: show short code -->
+  <div class={!sessionStarted || isStreaming ? 'is-hidden' : ''}>
+    {#if shortCode}
+      <div class="notification is-info">
+        <p class="is-size-5 has-text-weight-bold mb-2">连接码</p>
+        <p class="is-size-2 has-text-weight-bold has-text-centered my-3" style="letter-spacing: 0.3em; font-family: monospace;">
+          {shortCode}
+        </p>
+        <p class="is-size-7">将此 6 位码发送给对方，等待对方加入。</p>
+      </div>
+      {#if connectingParticipant}
+        <div class="notification is-success is-light">
+          <p>对方正在连接中...</p>
+        </div>
+      {/if}
+    {:else}
+      <div class="notification is-warning is-light">
+        <p>正在生成连接码...</p>
+      </div>
+    {/if}
+
+    <button class="button is-danger is-small mt-2" on:click={onDisconnectClick}>
+      <span class="icon"><i class="fas fa-unlink"></i></span>
+      <span>{L.cancel()}</span>
+    </button>
   </div>
 </div>

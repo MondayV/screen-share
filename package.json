@@ -1,6 +1,6 @@
 {
   "name": "pc-connect",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "PC Connect - 屏幕共享工具",
   "main": "./out/main/index.js",
   "author": {
@@ -11,6 +11,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
+    "start:server": "node server.js",
     "translations": "typesafe-i18n --no-watch",
     "translations:watch": "typesafe-i18n",
     "build:win": "electron-vite build && node scripts/prepackage.cjs && electron-builder --win --publish never --prepackaged release/win-unpacked",
@@ -24,6 +25,7 @@
     "@sweetalert2/theme-bulma": "5.0.18",
     "electron-settings": "4.0.4",
     "esbuild": "^0.28.0",
+    "express": "^5.2.1",
     "sweetalert2": "11.14.5",
     "typesafe-i18n": "5.26.2"
   },
