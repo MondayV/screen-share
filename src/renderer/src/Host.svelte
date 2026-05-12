@@ -68,8 +68,6 @@
           timer: 1500
         })
         break
-      default:
-        break
     }
   }
 
@@ -144,6 +142,8 @@
 
 <div class="container p-5">
   <h1 class="title">{!isStreaming ? L.host_a_session() : L.hosting_a_session()}</h1>
+
+  <!-- Streaming controls -->
   <div class={!isStreaming ? 'is-hidden' : ''}>
     <div class="fixed-grid">
       <div class="grid">
@@ -153,9 +153,7 @@
             class="button {displayStreamActive ? 'is-success' : 'is-danger'}"
             on:click={onDisplayStreamToggle}
           >
-            <span class="icon">
-              <i class="fa-solid fa-display"></i>
-            </span>
+            <span class="icon"><i class="fa-solid fa-display"></i></span>
           </button>
           {#if hasAudioInput}
             <button
@@ -179,110 +177,88 @@
           {/if}
           <button
             title={cursorsActive ? L.remote_cursors_enabled() : L.remote_cursors_disabled()}
-            class="button {cursorsActive ? 'is-success' : 'is-danger'} {!displayStreamActive
-              ? 'is-hidden'
-              : ''}"
+            class="button {cursorsActive ? 'is-success' : 'is-danger'} {!displayStreamActive ? 'is-hidden' : ''}"
             on:click={toggleRemoteCursors}
           >
-            <span class="icon">
-              <i class="fas fa-mouse-pointer"></i>
-            </span>
+            <span class="icon"><i class="fas fa-mouse-pointer"></i></span>
           </button>
         </div>
         <div class="cell has-text-right">
           <button class="button is-danger" on:click={onDisconnectClick}>
-            <span class="icon">
-              <i class="fas fa-unlink"></i>
-            </span>
+            <span class="icon"><i class="fas fa-unlink"></i></span>
             <span>{L.disconnect()}</span>
           </button>
         </div>
       </div>
     </div>
   </div>
+
   <div class="fixed-grid has-2-cols">
     <div class="grid">
-      <div class="cell">
-        <button
-          class="button is-link {isStreaming ? 'is-hidden' : ''}"
-          disabled={sessionStarted}
-          on:click={onStartSessionButtonClick}
-        >
-          <span class="icon">
-            <i class="fas fa-play"></i>
-          </span>
-          <span>{!sessionStarted ? L.start_a_new_session() : L.session_started()}</span>
+      <!-- Start session button (visible before session) -->
+      <div class="cell {sessionStarted ? 'is-hidden' : ''}">
+        <button class="button is-link" disabled={sessionStarted} on:click={onStartSessionButtonClick}>
+          <span class="icon"><i class="fas fa-play"></i></span>
+          <span>{L.start_a_new_session()}</span>
         </button>
       </div>
 
-      <div class="cell">
-        <button
-          class="button is-danger {!sessionStarted || isStreaming ? 'is-hidden' : ''}"
-          on:click={onDisconnectClick}
-        >
-          <span class="icon">
-            <i class="fas fa-unlink"></i>
-          </span>
-          <span>{L.cancel()}</span>
-        </button>
-      </div>
-
-      <div class="cell">
-        <button
-          class="button is-link {!sessionStarted || isStreaming
-            ? 'is-hidden'
-            : ''} {copyButtonIsLoading ? 'is-loading' : ''}"
-          bind:this={copyButton}
-        >
-          <span class="icon">
-            <i class="fas fa-copy"></i>
-          </span>
+      <!-- After session started: show controls -->
+      <div class="cell {!sessionStarted || isStreaming ? 'is-hidden' : ''}">
+        <button class="button is-link {copyButtonIsLoading ? 'is-loading' : ''}" bind:this={copyButton}>
+          <span class="icon"><i class="fas fa-copy"></i></span>
           <span>{L.copy_my_connection_string()}</span>
+        </button>
+      </div>
+
+      <div class="cell {!sessionStarted || isStreaming ? 'is-hidden' : ''}">
+        <button class="button is-danger" on:click={onDisconnectClick}>
+          <span class="icon"><i class="fas fa-unlink"></i></span>
+          <span>{L.cancel()}</span>
         </button>
       </div>
     </div>
 
-    <div class="field has-addons {!sessionStarted || isStreaming ? 'is-hidden' : ''}">
-      <div class="control has-icons-left has-icons-right">
-        <input
-          bind:value={$connectionString}
-          placeholder="输入参与者的连接码"
-          class="input {connectionStringIsValid === null
-            ? ''
-            : connectionStringIsValid
-              ? 'is-success'
-              : 'is-danger'}"
-          type="text"
-        />
-        <span class="icon is-small is-left">
-          <i class="fas fa-user"></i>
-        </span>
-        <span class="icon is-small is-right">
-          <i
-            class="fas fa-question {connectionStringIsValid === null
+    <!-- Participant connection input (after session started, before streaming) -->
+    <div class="cell {!sessionStarted || isStreaming ? 'is-hidden' : ''}">
+      <div class="field has-addons">
+        <div class="control has-icons-left has-icons-right">
+          <input
+            bind:value={$connectionString}
+            placeholder="输入参与者的连接码"
+            class="input {connectionStringIsValid === null
+              ? ''
+              : connectionStringIsValid ? 'is-success' : 'is-danger'}"
+            type="text"
+          />
+          <span class="icon is-small is-left"><i class="fas fa-user"></i></span>
+          <span class="icon is-small is-right">
+            <i class="fas {connectionStringIsValid === null
               ? 'fa-question'
-              : connectionStringIsValid
-                ? 'fa-check'
-                : 'fa-times'}"
-          ></i>
-        </span>
-      </div>
-      <div class="control">
-        <button
-          class="button {connectionStringIsValid === null
-            ? 'is-link'
-            : connectionStringIsValid
-              ? 'is-success'
-              : 'is-danger'}"
-          bind:this={connectButton}
-          disabled={connectionStringIsValid ? false : true}
-        >
-          <span class="icon">
-            <i class="fas fa-link"></i>
+              : connectionStringIsValid ? 'fa-check' : 'fa-times'}"></i>
           </span>
-          <span>{L.connect()} {connectionStringIsValid ? connectToUserName : ''} </span>
-        </button>
+        </div>
+        <div class="control">
+          <button
+            class="button {connectionStringIsValid === null
+              ? 'is-link'
+              : connectionStringIsValid ? 'is-success' : 'is-danger'}"
+            bind:this={connectButton}
+            disabled={!connectionStringIsValid}
+          >
+            <span class="icon"><i class="fas fa-link"></i></span>
+            <span>{L.connect()} {connectionStringIsValid ? connectToUserName : ''}</span>
+          </button>
+        </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Status message when session is ready but not yet streaming -->
+  <div class={sessionStarted && !isStreaming ? '' : 'is-hidden'}>
+    <div class="notification is-info">
+      <p><strong>共享已准备就绪</strong> — 复制连接码发送给对方，等待对方连接。</p>
+      <p class="is-size-7 mt-2">对方连接后，在此输入对方返回的连接码以完成连接。</p>
     </div>
   </div>
 </div>

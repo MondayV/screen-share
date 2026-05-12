@@ -1,6 +1,6 @@
 export const enum ConnectionType {
-  HOST = 'host',
-  PARTICIPANT = 'participant'
+  HOST = 'h',
+  PARTICIPANT = 'p'
 }
 
 export type RTCSessionDescriptionOptions = RTCSessionDescriptionInit
@@ -21,28 +21,43 @@ export const getUUIDv4 = (): string => {
   })
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-export const compressJson = async (data: any): Promise<string> => {
-  const stream = new Blob([JSON.stringify(data)], {
-    type: 'application/json'
-  }).stream()
+const base64urlEncode = (buffer: ArrayBuffer): string => {
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+}
+
+const base64urlDecode = (str: string): ArrayBuffer => {
+  let base64 = str.replace(/-/g, '+').replace(/_/g, '/')
+  while (base64.length % 4) {
+    base64 += '='
+  }
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return bytes.buffer
+}
+
+export const compressJson = async (data: unknown): Promise<string> => {
+  const stream = new Blob([JSON.stringify(data)], { type: 'application/json' }).stream()
   const compressedStream = stream.pipeThrough(new CompressionStream('gzip'))
   const compressedResponse = new Response(compressedStream)
   const blob = await compressedResponse.blob()
   const buffer = await blob.arrayBuffer()
-  return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+  return base64urlEncode(buffer)
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-export const decompressJson = async (data: string): Promise<any> => {
-  const buffer = new Uint8Array(
-    atob(data)
-      .split('')
-      .map((c) => c.charCodeAt(0))
-  )
-  const stream = new Blob([buffer], {
-    type: 'application/json'
-  }).stream()
+export const decompressJson = async <T = unknown>(data: string): Promise<T> => {
+  const buffer = base64urlDecode(data)
+  const stream = new Blob([buffer], { type: 'application/json' }).stream()
   const decompressedStream = stream.pipeThrough(new DecompressionStream('gzip'))
   const res = new Response(decompressedStream)
   const blob = await res.blob()
@@ -52,28 +67,25 @@ export const decompressJson = async (data: string): Promise<any> => {
 export const mayBeConnectionString = (ct: ConnectionType, str: string): boolean => {
   try {
     const url = new URL(str)
-    if (url.protocol !== 'pcconnect:') return false
-    if (url.pathname.slice(2) !== ct) return false
-    const token = url.searchParams.get('token')
-    const username = url.searchParams.get('username')
-    if (!token || !username) return false
+    if (url.protocol !== 'pc:') return false
+    const parts = url.pathname.split('/').filter(Boolean)
+    if (parts[0] !== ct) return false
+    const token = parts[1]
+    if (!token || token.length < 20) return false
     decompressJson(token)
     return true
-  } catch (err) {
+  } catch {
     return false
   }
 }
 
 export const getConnectionString = async (
   ct: ConnectionType,
-  offer: RTCSessionDescriptionInit,
-  data: {
-    username: string
-  }
+  desc: RTCSessionDescriptionInit,
+  data: { username: string }
 ): Promise<string> => {
-  const { username } = data
-  const token = encodeURIComponent(await compressJson(offer))
-  return `pcconnect://${ct}?username=${encodeURIComponent(username)}&token=${token}`
+  const token = await compressJson({ d: desc, u: data.username })
+  return `pc://${ct}/${token}`
 }
 
 export const getDataFromPcConnectUrl = async (
@@ -84,29 +96,25 @@ export const getDataFromPcConnectUrl = async (
   rtcSessionDescription: RTCSessionDescriptionInit
 }> => {
   const u = new URL(url)
-  const token = u.searchParams.get('token')
-  const username = u.searchParams.get('username')
+  const parts = u.pathname.split('/').filter(Boolean)
+  const type = parts[0] as ConnectionType
+  const token = parts[1]
+  const raw = await decompressJson<{ d: RTCSessionDescriptionInit; u: string }>(token)
   return {
-    type: u.pathname.slice(2) as ConnectionType,
-    data: {
-      username: username
-    },
-    rtcSessionDescription: await decompressJson(decodeURIComponent(token))
+    type,
+    data: { username: raw.u },
+    rtcSessionDescription: raw.d
   }
 }
 
 export const makeVideoDraggable = (video: HTMLVideoElement): void => {
-  let startX: number
-  let startY: number
-  let initialX: number
-  let initialY: number
-  let isDragging = false
+  let startX: number, startY: number, initialX: number, initialY: number, isDragging = false
+
   video.addEventListener('mousedown', (e) => {
     isDragging = true
     startX = e.clientX
     startY = e.clientY
     const transform = getComputedStyle(video).transform
-
     if (transform !== 'none') {
       const values = transform.split('(')[1].split(')')[0].split(',')
       initialX = parseFloat(values[4])
@@ -117,16 +125,10 @@ export const makeVideoDraggable = (video: HTMLVideoElement): void => {
     }
     video.style.cursor = 'grabbing'
   })
+
   document.addEventListener('mousemove', (e) => {
     if (!isDragging) return
-
-    const deltaX = e.clientX - startX
-    const deltaY = e.clientY - startY
-
-    const moveX = initialX + deltaX
-    const moveY = initialY + deltaY
-
-    video.style.transform = `translate(${moveX}px, ${moveY}px)`
+    video.style.transform = `translate(${initialX + e.clientX - startX}px, ${initialY + e.clientY - startY}px)`
   })
 
   document.addEventListener('mouseup', () => {
@@ -143,9 +145,7 @@ export const debounce = <T extends (...args: unknown[]) => void>(
   let timeout: ReturnType<typeof setTimeout>
   return (...args: Parameters<T>): void => {
     clearTimeout(timeout)
-    timeout = setTimeout(() => {
-      func(...args)
-    }, wait)
+    timeout = setTimeout(() => { func(...args) }, wait)
   }
 }
 

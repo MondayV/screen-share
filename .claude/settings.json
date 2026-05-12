@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /tmp/bananas -type f -not -path \"*/node_modules/*\" -not -path \"*/.git/*\" 2>/dev/null | sort)",
+      "Read(//tmp/**)",
+      "Read(//tmp/bananas/**)",
+      "Bash(zip -r \"PC-Connect-v1.0.0-portable-win32-x64.zip\" release/ -x \"release/win-unpacked/resources/app/node_modules/*\")"
+    ]
+  }
+}

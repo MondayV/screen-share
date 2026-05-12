@@ -31,6 +31,7 @@
   let copyButtonIsLoading = false
   let connectionString = useParticipantUrl()
   let visualizerIsActive: boolean = true
+  let connecting = false
 
   const onConnectionStringChange = async (): Promise<void> => {
     if ($connectionString === '') {
@@ -54,6 +55,7 @@
           showConfirmButton: false,
           timer: 1500
         })
+        connecting = false
         break
       case 'failed':
         Swal.fire({
@@ -63,6 +65,7 @@
           showConfirmButton: false,
           timer: 1500
         })
+        connecting = false
         break
       case 'closed':
         Swal.fire({
@@ -72,8 +75,7 @@
           showConfirmButton: false,
           timer: 1500
         })
-        break
-      default:
+        connecting = false
         break
     }
   }
@@ -86,6 +88,7 @@
     microphoneActive = settings.isMicrophoneEnabledOnConnect
     makeVideoDraggable(remoteScreen)
     connectButton.addEventListener('click', async () => {
+      connecting = true
       await webRTCComponent.Setup(remoteScreen)
       const data = await getDataFromPcConnectUrl($connectionString)
       await webRTCComponent.Connect(data.rtcSessionDescription)
@@ -128,6 +131,7 @@
     isStreaming = false
     microphoneActive = false
     isConnected = false
+    connecting = false
     $navigationEnabled = true
     $isWatching = false
   }
@@ -156,8 +160,18 @@
 <WebRTC bind:connectionState bind:this={webRTCComponent} />
 
 <div class="container p-5">
-  <h1 class="title">{!isStreaming ? L.join_a_session() : L.joined_a_session()}</h1>
-  <div class={!isStreaming ? 'is-hidden' : ''}>
+  <h1 class="title">
+    {#if isStreaming}
+      {L.joined_a_session()}
+    {:else if isConnected || connecting}
+      {L.joined_a_session()}...
+    {:else}
+      {L.join_a_session()}
+    {/if}
+  </h1>
+
+  <!-- Connected/Streaming controls (visible after connect, even if video hasn't started) -->
+  <div class={!isConnected && !connecting ? 'is-hidden' : ''}>
     <div class="fixed-grid">
       <div class="grid">
         <div class="cell">
@@ -183,70 +197,55 @@
         </div>
         <div class="cell has-text-right">
           <button class="button is-danger" aria-label={L.disconnect()} on:click={onDisconnectClick}>
-            <span class="icon">
-              <i class="fas fa-unlink"></i>
-            </span>
+            <span class="icon"><i class="fas fa-unlink"></i></span>
             <span>{L.disconnect()}</span>
           </button>
         </div>
       </div>
     </div>
   </div>
+
   <div class="fixed-grid has-2-cols">
     <div class="grid">
+      <!-- Input form (hidden when connected or connecting) -->
       <div class="cell">
-        <div class="field has-addons {isStreaming || isConnected ? 'is-hidden' : ''}">
+        <div class="field has-addons {isConnected || connecting ? 'is-hidden' : ''}">
           <div class="control has-icons-left has-icons-right">
             <input
               bind:value={$connectionString}
               placeholder={L.host_connection_string()}
               class="input {connectionStringIsValid === null
                 ? ''
-                : connectionStringIsValid
-                  ? 'is-success'
-                  : 'is-danger'}"
+                : connectionStringIsValid ? 'is-success' : 'is-danger'}"
               type="text"
             />
-            <span class="icon is-small is-left">
-              <i class="fas fa-user"></i>
-            </span>
+            <span class="icon is-small is-left"><i class="fas fa-user"></i></span>
             <span class="icon is-small is-right">
-              <i
-                class="fas fa-question {connectionStringIsValid === null
-                  ? 'fa-question'
-                  : connectionStringIsValid
-                    ? 'fa-check'
-                    : 'fa-times'}"
-              ></i>
+              <i class="fas {connectionStringIsValid === null
+                ? 'fa-question'
+                : connectionStringIsValid ? 'fa-check' : 'fa-times'}"></i>
             </span>
           </div>
           <div class="control">
             <button
               class="button {connectionStringIsValid === null
                 ? 'is-link'
-                : connectionStringIsValid
-                  ? 'is-success'
-                  : 'is-danger'}"
+                : connectionStringIsValid ? 'is-success' : 'is-danger'}"
               bind:this={connectButton}
-              disabled={connectionStringIsValid ? false : true}
+              disabled={!connectionStringIsValid}
             >
-              <span class="icon">
-                <i class="fas fa-link"></i>
-              </span>
-              <span>{L.connect()} {connectionStringIsValid ? connectToUserName : ''} </span>
+              <span class="icon"><i class="fas fa-link"></i></span>
+              <span>{L.connect()} {connectionStringIsValid ? connectToUserName : ''}</span>
             </button>
           </div>
         </div>
-        <div class="control">
+        <!-- Copy participant URL button (visible after connected, before streaming) -->
+        <div class="control {!isConnected || isStreaming ? 'is-hidden' : ''}">
           <button
-            class="button is-link {!isConnected || isStreaming
-              ? 'is-hidden'
-              : ''} {copyButtonIsLoading ? 'is-loading' : ''}"
+            class="button is-link {copyButtonIsLoading ? 'is-loading' : ''}"
             bind:this={copyButton}
           >
-            <span class="icon">
-              <i class="fas fa-copy"></i>
-            </span>
+            <span class="icon"><i class="fas fa-copy"></i></span>
             <span>{L.copy_my_connection_string()}</span>
           </button>
         </div>
@@ -256,9 +255,7 @@
           class="button is-danger {isStreaming || !isConnected ? 'is-hidden' : ''}"
           on:click={onDisconnectClick}
         >
-          <span class="icon">
-            <i class="fas fa-unlink"></i>
-          </span>
+          <span class="icon"><i class="fas fa-unlink"></i></span>
           <span>{L.cancel()}</span>
         </button>
       </div>
@@ -266,34 +263,41 @@
   </div>
 </div>
 
-<div class={!isStreaming ? 'is-hidden' : ''}>
+<!-- Remote screen area (visible when connected or connecting, even before video plays) -->
+<div class={!isConnected && !connecting ? 'is-hidden' : ''}>
   <div class="field">
     <label class="label" for="remote_screen">{L.remote_screen()}</label>
     <div class="control">
       <div class="video-overflow">
-        <video bind:this={remoteScreen} id="remote_screen" class="video" autoplay playsinline muted
+        {#if !isStreaming}
+          <div class="video-placeholder has-text-centered p-6">
+            <p class="is-size-5 has-text-grey">
+              等待远程屏幕...<br/>
+              <span class="is-size-7">请确保对方已接受连接并共享屏幕</span>
+            </p>
+          </div>
+        {/if}
+        <video
+          bind:this={remoteScreen}
+          id="remote_screen"
+          class="video {!isStreaming ? 'is-hidden' : ''}"
+          autoplay playsinline muted
         ></video>
       </div>
     </div>
   </div>
-  <div class="field">
+  <div class="field {!isStreaming ? 'is-hidden' : ''}">
     <div class="control">
       <button class="button is-info" on:click={onZoomInClick}>
-        <span class="icon">
-          <i class="fas fa-search-plus"></i>
-        </span>
+        <span class="icon"><i class="fas fa-search-plus"></i></span>
         <span>{L.zoom_in()}</span>
       </button>
       <button class="button is-info" on:click={onZoomOutClick}>
-        <span class="icon">
-          <i class="fas fa-search-minus"></i>
-        </span>
+        <span class="icon"><i class="fas fa-search-minus"></i></span>
         <span>{L.zoom_out()}</span>
       </button>
       <button class="button is-info" on:click={onFullscreenClick}>
-        <span class="icon">
-          <i class="fas fa-expand"></i>
-        </span>
+        <span class="icon"><i class="fas fa-expand"></i></span>
         <span>{L.fullscreen()}</span>
       </button>
     </div>
@@ -310,5 +314,17 @@
     width: 100%;
     height: auto;
     overflow: hidden;
+    min-height: 200px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    background: #1a1a1a;
+  }
+  .video-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    color: #888;
   }
 </style>
