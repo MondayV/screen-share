@@ -1,4 +1,3 @@
-const { execSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 
@@ -17,6 +16,14 @@ fs.mkdirSync(appDir, { recursive: true })
 console.log('Copying electron...')
 fs.cpSync(electronDist, releaseDir, { recursive: true })
 
+// Rename electron.exe to PCConnect.exe for shortcut compatibility
+const electronExe = path.join(releaseDir, 'electron.exe')
+const pcConnectExe = path.join(releaseDir, 'PCConnect.exe')
+if (fs.existsSync(electronExe)) {
+  fs.renameSync(electronExe, pcConnectExe)
+  console.log('Renamed electron.exe -> PCConnect.exe')
+}
+
 // Copy built output
 console.log('Copying out/...')
 fs.cpSync(path.join(__dirname, '..', 'out'), path.join(appDir, 'out'), { recursive: true })
@@ -24,8 +31,8 @@ fs.cpSync(path.join(__dirname, '..', 'out'), path.join(appDir, 'out'), { recursi
 // Copy package.json
 fs.copyFileSync(path.join(__dirname, '..', 'package.json'), path.join(appDir, 'package.json'))
 
-// Copy node_modules
-console.log('Copying node_modules (this may take a minute)...')
+// Copy node_modules (all, for complete dependency tree)
+console.log('Copying node_modules...')
 fs.cpSync(
   path.join(__dirname, '..', 'node_modules'),
   path.join(appDir, 'node_modules'),
