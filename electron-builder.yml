@@ -21,6 +21,10 @@ nsis:
   shortcutName: PC Connect
   uninstallDisplayName: PC Connect
   createDesktopShortcut: always
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   icon: build/icon.icns
