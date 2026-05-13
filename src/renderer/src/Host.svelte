@@ -60,15 +60,32 @@
   $: connectionState, onConnectionStateChange()
 
   const onStartSessionButtonClick = async (): Promise<void> => {
-    await webRTCComponent.Setup(null)
-    isSharing = true
-    $navigationEnabled = false
-    $isHosting = true
-    hasAudioInput = webRTCComponent.HasAudioInput()
-    // Floating window
-    try { await window.PcConnectApi.toggleFloatingWindow(true) } catch {}
-
+    // Check signaling server first
     try {
+      const settings = await window.PcConnectApi.getSettings()
+      const serverUrl = settings.serverUrl || 'http://localhost:3456'
+      const health = await fetch(serverUrl + '/health')
+      if (!health.ok) throw new Error('服务器响应异常')
+    } catch {
+      Swal.fire({
+        icon: 'warning',
+        title: '信令服务器未连接',
+        text: '请先启动信令服务器：node server.js\n默认端口 3456',
+        confirmButtonText: '知道了',
+        footer: '<a href="https://github.com/MondayV/screen-share#使用说明" target="_blank">查看使用说明</a>'
+      })
+      return
+    }
+
+    // Proceed with session setup
+    try {
+      await webRTCComponent.Setup(null)
+      isSharing = true
+      $navigationEnabled = false
+      $isHosting = true
+      hasAudioInput = webRTCComponent.HasAudioInput()
+      try { await window.PcConnectApi.toggleFloatingWindow(true) } catch {}
+
       const desc = await webRTCComponent.CreateHostOffer()
       if (desc) {
         const code = await hostToServer(desc, (await window.PcConnectApi.getSettings()).username)
@@ -86,7 +103,9 @@
         }, 2000)
       }
     } catch (e) {
-      Swal.fire({ icon: 'error', title: '无法连接信令服务器', text: '请确认服务器已启动' })
+      Swal.fire({ icon: 'error', title: '共享启动失败', text: '请重试' })
+      reset()
+      return
     }
 
     // Wire up data channel callbacks

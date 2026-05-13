@@ -22,10 +22,10 @@
     {/if}
   </div>
   <div class="nav-tabs">
-    <button class="nav-tab" class:active={$activeView === 'join'} data-action="join" on:click={handleTopButtonsClick} disabled={!$navigationEnabled && $activeView !== 'join'}>
+    <button class="nav-tab" class:active={$activeView === 'join'} data-action="join" on:click={handleTopButtonsClick} disabled={!$navigationEnabled && !$isWatching}>
       <i class="fa-solid fa-right-to-bracket"></i> {!$isWatching ? L.join_a_session() : L.joined_a_session()}
     </button>
-    <button class="nav-tab" class:active={$activeView === 'host'} data-action="host" on:click={handleTopButtonsClick} disabled={!$navigationEnabled && $activeView !== 'host'}>
+    <button class="nav-tab" class:active={$activeView === 'host'} data-action="host" on:click={handleTopButtonsClick} disabled={!$navigationEnabled && !$isHosting}>
       <i class="fa-solid fa-earth-africa"></i> {!$isHosting ? L.host_a_session() : L.hosting_a_session()}
     </button>
   </div>

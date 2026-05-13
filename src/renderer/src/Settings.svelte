@@ -59,7 +59,7 @@
   }
   async function onSubmit(evt: Event): Promise<void> {
     evt.preventDefault()
-    if (isUsernameValid && isColorValid && isIceServersValid) {
+    if (isUsernameValid && isColorValid && isServerUrlValid && isIceServersValid) {
       await window.PcConnectApi.updateSettings({
         username: usernameValue,
         color: colorValue,
@@ -110,8 +110,9 @@
   </div>
 </div>
 
-<div class="container p-5 content">
-  <h1 class="title">{L.settings()}</h1>
+<div class="settings-container">
+  <h1 class="title px-5 pt-5">{L.settings()}</h1>
+  <div class="settings-scroll">
   <h2>{L.basic()}</h2>
   <form class="form" on:submit={onSubmit}>
     <div class="field">
@@ -214,9 +215,19 @@
       </div>
     </div>
   </form>
+  </div>
 </div>
 
 <style>
+  .settings-container { display: flex; flex-direction: column; height: 100vh; }
+  .settings-scroll {
+    flex: 1; overflow-y: auto; padding: 0 2rem 2rem 2rem;
+    scrollbar-width: thin; scrollbar-color: #45475a #1e1e2e;
+  }
+  .settings-scroll::-webkit-scrollbar { width: 6px; }
+  .settings-scroll::-webkit-scrollbar-track { background: #1e1e2e; }
+  .settings-scroll::-webkit-scrollbar-thumb { background: #45475a; border-radius: 3px; }
+  .settings-scroll::-webkit-scrollbar-thumb:hover { background: #585b70; }
   span.icon i.fa-palette:before {
     color: var(--color);
     text-shadow: '-1px 0 black, 0 1px black, 1px 0 black, 0 -1px black';
