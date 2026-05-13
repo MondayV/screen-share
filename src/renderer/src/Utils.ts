@@ -146,7 +146,8 @@ export const mayBeShortCode = (str: string): boolean => /^[A-Za-z0-9]{4,8}$/.tes
 
 export const getShortLink = (code: string): string => `pc://${code.toUpperCase()}`
 
-export const makeVideoDraggable = (video: HTMLVideoElement): void => {
+export const makeVideoDraggable = (video: HTMLVideoElement | null): void => {
+  if (!video) return
   let startX: number, startY: number, initialX: number, initialY: number, isDragging = false
 
   video.addEventListener('mousedown', (e) => {

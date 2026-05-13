@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte'
   import Navigation from './Navigation.svelte'
   import Join from './Join.svelte'
   import Host from './Host.svelte'
@@ -6,12 +7,15 @@
   import About from './About.svelte'
   import { useActiveView, useNavigationEnabled, useIsHosting, useIsWatching, useParticipantUrl, useHostUrl } from './stores'
   import { getDataFromPcConnectUrl } from './Utils'
+  import { initSignaling, destroySignaling, signalingState, setSignalingUrl } from './signaling'
+
   const activeView = useActiveView()
   const participantUrl = useParticipantUrl()
   const hostUrl = useHostUrl()
   const isHosting = useIsHosting()
   useNavigationEnabled()
   useIsWatching()
+
   window.onmessage = async (evt: MessageEvent): Promise<void> => {
     const { data } = evt
     if (data.type !== 'openPcConnectURL') return
@@ -27,6 +31,18 @@
         break
     }
   }
+
+  onMount(async () => {
+    // Auto-connect signaling with server URL from settings
+    try {
+      const settings = await window.PcConnectApi.getSettings()
+      const url = settings.serverUrl || 'http://localhost:3456'
+      const wsUrl = url.replace(/^http/, 'ws')
+      initSignaling(wsUrl)
+    } catch {
+      initSignaling('ws://localhost:3456')
+    }
+  })
 </script>
 
 <div class="app-shell">

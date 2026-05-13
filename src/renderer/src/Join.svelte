@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, onDestroy } from 'svelte'
   import Swal from 'sweetalert2'
   import { L } from './translations'
-  import { makeVideoDraggable, mayBeShortCode, getOfferFromServer, sendAnswerToServer, getUUIDv4 } from './Utils'
+  import { makeVideoDraggable, mayBeShortCode, getUUIDv4 } from './Utils'
   import { useNavigationEnabled, useIsWatching, useParticipantUrl } from './stores'
+  import { signalingState, sendSignal, onSignalMessage, offSignalMessage } from './signaling'
   import WebRTC from './WebRTC.svelte'
   import AudioVisualizer from './AudioVisualizer.svelte'
   import Annotation from './Annotation.svelte'
@@ -43,8 +44,8 @@
   const onShortCodeChange = (): void => {
     const clean = shortCode.trim().toUpperCase()
     if (clean === '') { codeValid = null; codeError = ''; return }
-    if (mayBeShortCode(clean)) { codeValid = true; codeError = '' }
-    else { codeValid = false; codeError = '请输入 4-8 位字母数字' }
+    codeValid = mayBeShortCode(clean)
+    codeError = codeValid ? '' : '请输入 4-8 位字母数字'
   }
 
   const onConnectionStateChange = (): void => {
@@ -70,40 +71,46 @@
     const settings = await window.PcConnectApi.getSettings()
     microphoneActive = settings.isMicrophoneEnabledOnConnect
     makeVideoDraggable(remoteScreen)
-    remoteScreen.addEventListener('dblclick', () => webRTCComponent.PingRemoteCursor('cursor-' + UUID))
-    remoteScreen.addEventListener('mousemove', (e) => {
-      const { offsetX, offsetY } = e
-      webRTCComponent.UpdateRemoteCursor({ x: offsetX / remoteScreen.clientWidth, y: offsetY / remoteScreen.clientHeight, name: settings.username, id: 'cursor-' + UUID, color: settings.color })
+    if (remoteScreen) {
+      remoteScreen.addEventListener('dblclick', () => webRTCComponent.PingRemoteCursor('cursor-' + UUID))
+      remoteScreen.addEventListener('mousemove', (e) => {
+        const { offsetX, offsetY } = e
+        webRTCComponent.UpdateRemoteCursor({ x: offsetX / remoteScreen.clientWidth, y: offsetY / remoteScreen.clientHeight, name: settings.username, id: 'cursor-' + UUID, color: settings.color })
+      })
+      remoteScreen.addEventListener('play', () => { if (!webRTCComponent.IsConnected()) return; isStreaming = true })
+    }
+
+    // Handle WebSocket signaling
+    onSignalMessage('offer', async (data) => {
+      try {
+        await webRTCComponent.Setup(remoteScreen, false)
+        const answer = await webRTCComponent.ConnectAndGetAnswer(data.sdp)
+        const s = await window.PcConnectApi.getSettings()
+        sendSignal({ type: 'participant-answer', code: shortCode.trim().toUpperCase(), sdp: answer, username: s.username })
+        isConnected = true
+        $isWatching = true
+        $navigationEnabled = false
+      } catch (e) {
+        Swal.fire({ position: 'center', icon: 'error', title: '连接失败', text: '建立连接时出错', confirmButtonText: '确定' })
+        connecting = false
+      }
     })
-    remoteScreen.addEventListener('play', () => { if (!webRTCComponent.IsConnected()) return; isStreaming = true })
+
+    onSignalMessage('error', (data) => {
+      Swal.fire({ position: 'center', icon: 'error', title: '连接失败', text: data.message || '请确认连接码正确', confirmButtonText: '确定' })
+      connecting = false
+    })
+  })
+
+  onDestroy(() => {
+    offSignalMessage('offer')
+    offSignalMessage('error')
   })
 
   const onConnectClick = async (): Promise<void> => {
     if (!codeValid) return
     connecting = true
-    try {
-      const offerData = await getOfferFromServer(shortCode.trim().toUpperCase())
-      await webRTCComponent.Setup(remoteScreen, false)
-      const answer = await webRTCComponent.ConnectAndGetAnswer(offerData.sdp)
-      const settings = await window.PcConnectApi.getSettings()
-      await sendAnswerToServer(shortCode.trim().toUpperCase(), answer, settings.username)
-      isConnected = true
-      $isWatching = true
-      $navigationEnabled = false
-
-      // Wire up data channels
-      webRTCComponent.SetOnChatMessage((data) => { chatComponent?.receiveMessage(data) })
-      webRTCComponent.SetOnReaction((data) => { quickReactions?.showReceivedReaction(data.emoji) })
-      webRTCComponent.SetOnRemoteControl((data) => {
-        if (data.type === 'granted') remoteControl.notifyControlGranted()
-        if (data.type === 'denied') remoteControl.notifyControlDenied()
-        if (data.type === 'end') { remoteControlActive = false; remoteControl.notifyControlEnded() }
-      })
-      webRTCComponent.SetOnAnnotation((data) => { annotationComponent?.receiveAnnotation(data) })
-    } catch (e) {
-      Swal.fire({ position: 'center', icon: 'error', title: '连接失败', text: e.message || '请确认连接码正确', confirmButtonText: '确定' })
-      connecting = false
-    }
+    sendSignal({ type: 'join', code: shortCode.trim().toUpperCase() })
   }
 
   const reset = (): void => {
@@ -123,17 +130,12 @@
   const onZoomOutClick = () => { if (zoomFactor <= 1) return; zoomFactor -= 0.1; remoteScreen.style.scale = zoomFactor.toString() }
   const onMicrophoneToggle = () => { microphoneActive = !microphoneActive; webRTCComponent.ToggleMicrophone() }
 
-  // Annotation
   const onAnnotationSend = (data: AnnotationData) => webRTCComponent.SendAnnotation(data)
 
-  // Remote control
-  const onRequestControl = () => webRTCComponent.SendRemoteControl({ type: 'request', from: '观看方' })
-  const onEndControl = () => { remoteControlActive = false; webRTCComponent.SendRemoteControl({ type: 'end' }) }
+  const onRequestControl = () => sendSignal({ type: 'remote-control', action: 'request' })
+  const onEndControl = () => { remoteControlActive = false; sendSignal({ type: 'remote-control', action: 'end' }) }
 
-  // Chat
   const onSendChat = (msg: ChatMessage) => webRTCComponent.SendChatMessage(msg)
-
-  // Reactions
   const onSendReaction = (emoji: string) => webRTCComponent.SendReaction({ emoji, from: '我' })
 </script>
 
@@ -143,21 +145,29 @@
 <div class="app-layout">
   <div class="main-area">
     {#if !isConnected && !connecting}
-      <!-- Code input screen -->
       <div class="join-screen">
         <h1 class="title has-text-centered">{L.join_a_session()}</h1>
-        <div class="field has-addons is-centered" style="max-width: 400px; margin: 40px auto;">
-          <div class="control is-expanded">
-            <input bind:value={shortCode} placeholder="输入连接码 如 A3F7K9" class="input is-medium {codeValid === null ? '' : codeValid ? 'is-success' : 'is-danger'}" style="font-family: monospace; letter-spacing: 0.2em; text-transform: uppercase;" type="text" maxlength="8" on:keydown={(e) => { if (e.key === 'Enter' && codeValid) onConnectClick() }} />
+        {#if $signalingState !== 'connected'}
+          <div class="has-text-centered">
+            {#if $signalingState === 'connecting'}
+              <p class="has-text-grey"><i class="fas fa-spinner fa-pulse"></i> 正在连接信令服务...</p>
+            {:else}
+              <p class="has-text-danger">信令服务连接失败，请重启应用</p>
+            {/if}
           </div>
-          <div class="control">
-            <button class="button is-success is-medium" on:click={onConnectClick} disabled={!codeValid}>{L.connect()}</button>
+        {:else}
+          <div class="field has-addons is-centered" style="max-width: 400px; margin: 40px auto;">
+            <div class="control is-expanded">
+              <input bind:value={shortCode} placeholder="输入连接码 如 A3F7K9" class="input is-medium {codeValid === null ? '' : codeValid ? 'is-success' : 'is-danger'}" style="font-family: monospace; letter-spacing: 0.2em; text-transform: uppercase;" type="text" maxlength="8" on:keydown={(e) => { if (e.key === 'Enter' && codeValid) onConnectClick() }} />
+            </div>
+            <div class="control">
+              <button class="button is-success is-medium" on:click={onConnectClick} disabled={!codeValid}>{L.connect()}</button>
+            </div>
           </div>
-        </div>
-        {#if codeError}<p class="help is-danger has-text-centered">{codeError}</p>{/if}
+          {#if codeError}<p class="help is-danger has-text-centered">{codeError}</p>{/if}
+        {/if}
       </div>
     {:else if isStreaming}
-      <!-- Remote screen -->
       <div class="remote-container">
         <div class="video-overflow">
           <video bind:this={remoteScreen} id="remote_screen" class="video" autoplay playsinline muted></video>
@@ -165,7 +175,6 @@
         <Annotation bind:this={annotationComponent} width={1920} height={1080} enabled={showAnnotation} {onAnnotationSend} />
       </div>
     {:else}
-      <!-- Connecting... -->
       <div class="connecting-screen has-text-centered">
         <p class="is-size-4">等待远程屏幕...</p>
         <progress class="progress is-small is-link mt-4" max="100" style="width: 300px; margin: 20px auto;"></progress>
@@ -173,7 +182,6 @@
     {/if}
   </div>
 
-  <!-- Chat sidebar -->
   {#if isConnected}
     <div class="sidebar" class:open={showChat}>
       <Chat bind:this={chatComponent} {onSendChat} visible={true} />
@@ -181,7 +189,6 @@
   {/if}
 </div>
 
-<!-- Bottom bar -->
 {#if isConnected}
   <div class="bottom-bar">
     <div class="bottom-controls">
@@ -198,9 +205,7 @@
         <button class="ctrl-btn" title="请求远程控制" on:click={() => remoteControl.requestControl()}>
           <i class="fas fa-mouse" style="color: {remoteControlActive ? '#2ecc71' : '#aaa'}"></i>
         </button>
-        {#if remoteScreen}
-          <RecordButton stream={remoteScreen.srcObject} />
-        {/if}
+        <RecordButton stream={remoteScreen?.srcObject || null} />
         <button class="ctrl-btn" title="聊天" on:click={() => showChat = !showChat}>
           <i class="fas fa-comment" style="color: {showChat ? '#89b4fa' : '#aaa'}"></i>
         </button>

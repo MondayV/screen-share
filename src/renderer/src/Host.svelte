@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, onDestroy } from 'svelte'
   import Swal from 'sweetalert2'
   import { L } from './translations'
   import { useNavigationEnabled, useIsHosting, useHostUrl } from './stores'
-  import { hostToServer, pollAnswerFromServer } from './Utils'
+  import { signalingState, sendSignal, onSignalMessage, offSignalMessage } from './signaling'
   import AudioVisualizer from './AudioVisualizer.svelte'
   import WebRTC from './WebRTC.svelte'
   import Chat from './Chat.svelte'
@@ -29,10 +29,8 @@
   let isStreaming = false
   let isSharing = false
   let shortCode = ''
-  let connectingParticipant = false
   let hasAudioInput = false
   let visualizerIsActive = true
-  let pollingTimer: ReturnType<typeof setInterval> | null = null
   let showChat = false
   let showAnnotation = false
   let remoteControlActive = false
@@ -41,15 +39,10 @@
     switch (connectionState) {
       case 'connected':
         Swal.fire({ position: 'top-end', icon: 'success', title: '连接建立成功', showConfirmButton: false, timer: 1500 })
-        connectingParticipant = false
         isStreaming = true
-        isSharing = true
-        if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null }
         break
       case 'failed':
         Swal.fire({ position: 'top-end', icon: 'error', title: '连接失败', showConfirmButton: false, timer: 1500 })
-        connectingParticipant = false
-        if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null }
         break
       case 'closed':
         Swal.fire({ position: 'center', icon: 'info', title: '共享已结束', text: '对方已断开连接', confirmButtonText: '返回', allowOutsideClick: false }).then(() => { reset() })
@@ -60,24 +53,6 @@
   $: connectionState, onConnectionStateChange()
 
   const onStartSessionButtonClick = async (): Promise<void> => {
-    // Check signaling server first
-    try {
-      const settings = await window.PcConnectApi.getSettings()
-      const serverUrl = settings.serverUrl || 'http://localhost:3456'
-      const health = await fetch(serverUrl + '/health')
-      if (!health.ok) throw new Error('服务器响应异常')
-    } catch {
-      Swal.fire({
-        icon: 'warning',
-        title: '信令服务器未连接',
-        text: '请先启动信令服务器：node server.js\n默认端口 3456',
-        confirmButtonText: '知道了',
-        footer: '<a href="https://github.com/MondayV/screen-share#使用说明" target="_blank">查看使用说明</a>'
-      })
-      return
-    }
-
-    // Proceed with session setup
     try {
       await webRTCComponent.Setup(null)
       isSharing = true
@@ -88,41 +63,47 @@
 
       const desc = await webRTCComponent.CreateHostOffer()
       if (desc) {
-        const code = await hostToServer(desc, (await window.PcConnectApi.getSettings()).username)
-        shortCode = code
-        $connectionString = code
-        pollingTimer = setInterval(async () => {
-          try {
-            const result = await pollAnswerFromServer(code)
-            if (result.ready && result.sdp) {
-              if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null }
-              connectingParticipant = true
-              await webRTCComponent.Connect(result.sdp)
-            }
-          } catch { /* keep polling */ }
-        }, 2000)
+        const settings = await window.PcConnectApi.getSettings()
+        sendSignal({ type: 'host-offer', sdp: desc, username: settings.username })
       }
     } catch (e) {
       Swal.fire({ icon: 'error', title: '共享启动失败', text: '请重试' })
       reset()
-      return
     }
+  }
 
-    // Wire up data channel callbacks
-    webRTCComponent.SetOnChatMessage((data) => { chatComponent?.receiveMessage(data) })
-    webRTCComponent.SetOnReaction((data) => { quickReactions?.showReceivedReaction(data.emoji) })
-    webRTCComponent.SetOnRemoteControl((data) => {
+  // Handle WebSocket signaling messages
+  onMount(() => {
+    onSignalMessage('code', (data) => {
+      shortCode = data.code
+      $connectionString = data.code
+    })
+
+    onSignalMessage('participant-answer', async (data) => {
+      await webRTCComponent.Connect(data.sdp)
+    })
+  })
+
+  onDestroy(() => {
+    offSignalMessage('code')
+    offSignalMessage('participant-answer')
+  })
+
+  // Wire up data channels
+  $: if (webRTCComponent && isSharing) {
+    webRTCComponent.SetOnChatMessage((data: any) => { chatComponent?.receiveMessage(data) })
+    webRTCComponent.SetOnReaction((data: any) => { quickReactions?.showReceivedReaction(data.emoji) })
+    webRTCComponent.SetOnRemoteControl((data: any) => {
       if (data.type === 'request') remoteControl.showRequestDialog(data.from)
       if (data.type === 'end') { remoteControlActive = false; remoteControl.notifyControlEnded() }
     })
   }
 
   const reset = (): void => {
-    if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null }
     window.PcConnectApi.toggleFloatingWindow(false).catch(() => {})
     $connectionString = ''; shortCode = ''; cursorsActive = false
     displayStreamActive = false; microphoneActive = true
-    isStreaming = false; isSharing = false; connectingParticipant = false
+    isStreaming = false; isSharing = false
     remoteControlActive = false; showChat = false; showAnnotation = false
     $navigationEnabled = true; $isHosting = false
   }
@@ -133,22 +114,15 @@
   }
 
   const onMicrophoneToggle = () => { microphoneActive = !microphoneActive; webRTCComponent.ToggleMicrophone() }
-  const onDisplayStreamToggle = () => {
-    displayStreamActive = !displayStreamActive; webRTCComponent.ToggleDisplayStream()
-    if (!displayStreamActive) { cursorsActive = false; window.PcConnectApi.toggleRemoteCursors(false); webRTCComponent.ToggleRemoteCursors(false) }
-  }
+  const onDisplayStreamToggle = () => { displayStreamActive = !displayStreamActive; webRTCComponent.ToggleDisplayStream() }
   const toggleRemoteCursors = () => { cursorsActive = !cursorsActive; window.PcConnectApi.toggleRemoteCursors(cursorsActive); webRTCComponent.ToggleRemoteCursors(cursorsActive) }
 
-  // Remote control handlers
-  const onRequestControl = () => webRTCComponent.SendRemoteControl({ type: 'request', from: '观看方' })
-  const onGrantControl = () => { remoteControlActive = true; webRTCComponent.SendRemoteControl({ type: 'granted' }) }
-  const onDenyControl = () => webRTCComponent.SendRemoteControl({ type: 'denied' })
-  const onEndControl = () => { remoteControlActive = false; webRTCComponent.SendRemoteControl({ type: 'end' }) }
+  const onRequestControl = () => sendSignal({ type: 'remote-control', action: 'request' })
+  const onGrantControl = () => { remoteControlActive = true; sendSignal({ type: 'remote-control', action: 'grant' }) }
+  const onDenyControl = () => sendSignal({ type: 'remote-control', action: 'deny' })
+  const onEndControl = () => { remoteControlActive = false; sendSignal({ type: 'remote-control', action: 'end' }) }
 
-  // Chat
   const onSendChat = (msg: ChatMessage) => webRTCComponent.SendChatMessage(msg)
-
-  // Reactions
   const onSendReaction = (emoji: string) => webRTCComponent.SendReaction({ emoji, from: '我' })
 </script>
 
@@ -156,16 +130,27 @@
 <RemoteControl bind:this={remoteControl} isHost={true} {onRequestControl} {onGrantControl} {onDenyControl} {onEndControl} />
 
 <div class="app-layout">
-  <!-- Main content -->
   <div class="main-area">
     {#if !isSharing}
       <div class="welcome-screen">
         <h1 class="title has-text-centered">{L.host_a_session()}</h1>
         <div class="has-text-centered mt-6">
-          <button class="button is-link is-large" on:click={onStartSessionButtonClick}>
-            <span class="icon"><i class="fas fa-play"></i></span>
-            <span>{L.start_a_new_session()}</span>
-          </button>
+          {#if $signalingState === 'connecting'}
+            <button class="button is-link is-large" disabled>
+              <span class="icon"><i class="fas fa-spinner fa-pulse"></i></span>
+              <span>正在连接信令服务...</span>
+            </button>
+          {:else if $signalingState === 'error'}
+            <div class="notification is-danger is-light" style="max-width: 400px; margin: 0 auto;">
+              <p>信令服务连接失败</p>
+              <p class="is-size-7 mt-2">请检查网络后重启应用</p>
+            </div>
+          {:else}
+            <button class="button is-link is-large" on:click={onStartSessionButtonClick}>
+              <span class="icon"><i class="fas fa-play"></i></span>
+              <span>{L.start_a_new_session()}</span>
+            </button>
+          {/if}
         </div>
       </div>
     {:else if isSharing && !isStreaming}
@@ -175,18 +160,13 @@
           <p class="is-size-1 has-text-weight-bold has-text-centered my-4" style="letter-spacing: 0.3em; font-family: monospace;">{shortCode || '...'}</p>
           <p class="is-size-7">将 6 位码发送给对方，等待连接</p>
         </div>
-        {#if connectingParticipant}
-          <div class="notification is-success is-light"><p>对方正在连接中...</p></div>
-        {/if}
         <button class="button is-danger is-small mt-2" on:click={onDisconnectClick}>取消</button>
       </div>
     {:else}
-      <!-- Streaming view: green border -->
       <div class="green-border"></div>
     {/if}
   </div>
 
-  <!-- Sidebar: Chat -->
   {#if isStreaming}
     <div class="sidebar" class:open={showChat}>
       <Chat bind:this={chatComponent} {onSendChat} visible={true} />
@@ -194,7 +174,6 @@
   {/if}
 </div>
 
-<!-- Bottom control bar (Tencent Meeting style) -->
 {#if isSharing}
   <div class="bottom-bar">
     <div class="bottom-controls">
@@ -217,7 +196,6 @@
         <i class="fas fa-phone-slash"></i>
       </button>
     </div>
-
     {#if isStreaming}
       <QuickReactions bind:this={quickReactions} {onSendReaction} visible={true} />
     {/if}
