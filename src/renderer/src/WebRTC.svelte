@@ -21,7 +21,6 @@
   let reactionChannel: RTCDataChannel | null = null
   let audioStream: MediaStream | null = null
   let stream: MediaStream | null = null
-  let cameraStream: MediaStream | null = null
   let audioElement: HTMLAudioElement | null = null
   let userSettings: SettingsData | null = null
 
@@ -126,10 +125,7 @@
   export function SetOnReaction(cb: ((data: any) => void) | null) { onReaction = cb }
   export function SendReaction(data: any) { if (reactionReady()) reactionChannel!.send(JSON.stringify(data)) }
 
-  // Camera stream
-  export function GetCameraStream(): MediaStream | null { return cameraStream }
-  export function HasCamera(): boolean { return cameraStream !== null && cameraStream.getVideoTracks().length > 0 }
-  export async function Setup(v: HTMLVideoElement = null, enableCamera: boolean = false): Promise<void> {
+  export async function Setup(v: HTMLVideoElement = null): Promise<void> {
     userSettings = await window.PcConnectApi.getSettings()
     remoteVideo = v
     audioElement = document.createElement('audio')
@@ -175,12 +171,6 @@
     } catch (e) {
       errorHander(e)
     }
-    // Camera capture for PIP
-    if (enableCamera) {
-      try {
-        cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-      } catch (e) { /* camera optional */ }
-    }
     if (!remoteVideo) {
       try {
         stream = await navigator.mediaDevices.getDisplayMedia({
@@ -196,11 +186,6 @@
             pc.addTrack(track, stream)
           }
         }
-        if (cameraStream) {
-          for (const track of cameraStream.getVideoTracks()) {
-            pc.addTrack(track, stream)
-          }
-        }
       } catch (e) {
         errorHander(e)
       }
@@ -208,11 +193,6 @@
       if (audioStream) {
         for (const track of audioStream.getTracks()) {
           track.enabled = userSettings.isMicrophoneEnabledOnConnect
-          pc.addTrack(track, audioStream)
-        }
-      }
-      if (cameraStream) {
-        for (const track of cameraStream.getVideoTracks()) {
           pc.addTrack(track, audioStream)
         }
       }

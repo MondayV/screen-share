@@ -24,6 +24,7 @@ declare global {
         username: string
         color: string
         language: string
+        serverUrl: string
         isMicrophoneEnabledOnConnect: boolean
         iceServers: IceServer[]
       }) => Promise<void>
@@ -31,6 +32,7 @@ declare global {
         username: string
         color: string
         language: string
+        serverUrl: string
         isMicrophoneEnabledOnConnect: boolean
         iceServers: IceServer[]
       }>

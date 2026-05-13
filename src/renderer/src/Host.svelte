@@ -6,7 +6,6 @@
   import { hostToServer, pollAnswerFromServer } from './Utils'
   import AudioVisualizer from './AudioVisualizer.svelte'
   import WebRTC from './WebRTC.svelte'
-  import PictureInPicture from './PictureInPicture.svelte'
   import Chat from './Chat.svelte'
   import QuickReactions from './QuickReactions.svelte'
   import RemoteControl from './RemoteControl.svelte'
@@ -34,7 +33,6 @@
   let hasAudioInput = false
   let visualizerIsActive = true
   let pollingTimer: ReturnType<typeof setInterval> | null = null
-  let cameraStream: MediaStream | null = null
   let showChat = false
   let showAnnotation = false
   let remoteControlActive = false
@@ -62,13 +60,11 @@
   $: connectionState, onConnectionStateChange()
 
   const onStartSessionButtonClick = async (): Promise<void> => {
-    await webRTCComponent.Setup(null, true)
+    await webRTCComponent.Setup(null)
     isSharing = true
     $navigationEnabled = false
     $isHosting = true
     hasAudioInput = webRTCComponent.HasAudioInput()
-    cameraStream = webRTCComponent.GetCameraStream()
-
     // Floating window
     try { await window.PcConnectApi.toggleFloatingWindow(true) } catch {}
 
@@ -168,9 +164,6 @@
     {:else}
       <!-- Streaming view: green border -->
       <div class="green-border"></div>
-      {#if cameraStream}
-        <PictureInPicture stream={cameraStream} visible={true} />
-      {/if}
     {/if}
   </div>
 

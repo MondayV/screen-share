@@ -37,6 +37,7 @@ const PcConnectApi = {
     username: string
     color: string
     language: string
+    serverUrl: string
     isMicrophoneEnabledOnConnect: boolean
     iceServers: IceServer[]
   }> => {
@@ -46,6 +47,7 @@ const PcConnectApi = {
     username: string
     color: string
     language: string
+    serverUrl: string
     isMicrophoneEnabledOnConnect: boolean
     iceServers: IceServer[]
   }): Promise<void> => {

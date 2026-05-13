@@ -12,6 +12,7 @@ export type SettingsData = {
   username: string
   color: string
   language: string
+  serverUrl: string
   isMicrophoneEnabledOnConnect: boolean
   iceServers: IceServer[]
 }
@@ -38,6 +39,7 @@ export const settingsKeeper = async (): Promise<Settings> => {
     username: 'PC用户',
     color: '#ffffff',
     language: 'zh',
+    serverUrl: 'http://localhost:3456',
     isMicrophoneEnabledOnConnect: true,
     iceServers: [
       {
@@ -50,6 +52,7 @@ export const settingsKeeper = async (): Promise<Settings> => {
     const username = settings.getSync('username') as string || defaultSettings.username
     const color = settings.getSync('color') as string || defaultSettings.color
     const language = settings.getSync('language') as string || defaultSettings.language
+    const serverUrl = settings.getSync('serverUrl') as string || defaultSettings.serverUrl
     const isMicrophoneEnabledOnConnect = settings.getSync('isMicrophoneEnabledOnConnect') as boolean ?? defaultSettings.isMicrophoneEnabledOnConnect
     const iceServers = settings.getSync('iceServers') as IceServer[] || defaultSettings.iceServers
 
@@ -57,6 +60,7 @@ export const settingsKeeper = async (): Promise<Settings> => {
       username,
       color,
       language,
+      serverUrl,
       isMicrophoneEnabledOnConnect,
       iceServers
     }
@@ -66,6 +70,7 @@ export const settingsKeeper = async (): Promise<Settings> => {
     settings.setSync('username', data.username)
     settings.setSync('color', data.color)
     settings.setSync('language', data.language)
+    settings.setSync('serverUrl', data.serverUrl)
     settings.setSync('isMicrophoneEnabledOnConnect', data.isMicrophoneEnabledOnConnect)
     settings.setSync('iceServers', data.iceServers)
   }

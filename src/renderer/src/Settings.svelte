@@ -7,6 +7,8 @@
   let usernameValue: string = 'PC用户'
   let colorValue: string = '#ffffff'
   let language = 'zh'
+  let serverUrlValue = 'http://localhost:3456'
+  let isServerUrlValid = true
   const languageOptions = ['zh']
   let iceServersValue: string = '{ "urls": "stun:stun.l.google.com:19302" }'
   let isUsernameValid = false
@@ -19,6 +21,7 @@
   $: colorValue, checkColor()
   $: usernameValue, checkUsername()
   $: iceServersValue, checkIceServers()
+  $: serverUrlValue, checkServerUrl()
   $: isMicrophoneEnabledOnConnect
 
   const checkIceServers = (): void => {
@@ -43,6 +46,10 @@
       isColorValid = false
     }
   }
+  const checkServerUrl = (): void => {
+    try { new URL(serverUrlValue); isServerUrlValid = true }
+    catch { isServerUrlValid = false }
+  }
   function checkUsername(): void {
     if (usernameValue.length > 0 && usernameValue.length < 32) {
       isUsernameValid = true
@@ -57,6 +64,7 @@
         username: usernameValue,
         color: colorValue,
         language,
+        serverUrl: serverUrlValue,
         isMicrophoneEnabledOnConnect,
         iceServers: iceServersValue.split('\n').map((srv) => JSON.parse(srv))
       })
@@ -76,6 +84,7 @@
     usernameValue = settings.username
     colorValue = settings.color
     language = settings.language
+    serverUrlValue = settings.serverUrl || 'http://localhost:3456'
     isMicrophoneEnabledOnConnect = settings.isMicrophoneEnabledOnConnect
     iceServersValue = settings.iceServers.map((srv) => JSON.stringify(srv)).join('\n')
   })
@@ -152,6 +161,21 @@
         </span>
       </div>
       <p class="help">{L.language_description()}</p>
+    </div>
+
+    <div class="field">
+      <label class="label" for="serverUrl">信令服务器地址</label>
+      <div class="control has-icons-left has-icons-right">
+        <input
+          bind:value={serverUrlValue}
+          class="input {isServerUrlValid ? 'is-success' : 'is-danger'}"
+          type="text"
+          id="serverUrl"
+          placeholder="http://localhost:3456"
+        />
+        <span class="icon is-small is-left"><i class="fas fa-server"></i></span>
+      </div>
+      <p class="help">屏幕共享信令服务器地址，默认 localhost:3456</p>
     </div>
 
     <h2>{L.media()}</h2>
