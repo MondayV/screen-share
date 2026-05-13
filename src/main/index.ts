@@ -4,7 +4,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { windowStateKeeper } from './stateKeeper'
-import { ipcMainHandlersInit } from './ipcMainHandlers'
+import { ipcMainHandlersInit, setMainWindow } from './ipcMainHandlers'
 import { isInProductionMode } from './utils'
 
 const CUSTOM_PROTOCOL = 'pcconnect'
@@ -106,6 +106,7 @@ app.whenReady().then(async () => {
   ipcMainHandlersInit()
 
   await createWindow()
+  setMainWindow(() => MAIN_WINDOW)
   const coldStartUrl = process.argv.find((arg) => arg.startsWith(CUSTOM_PROTOCOL + '://'))
   if (coldStartUrl) {
     sendOpenPcConnectUrlToRenderer(coldStartUrl)

@@ -1,6 +1,7 @@
 import type { SettingsData } from './stateKeeper'
 import { app, BrowserWindow, ipcMain, screen } from 'electron'
 import { createCursorsWindow } from './cursors'
+import { createFloatingWindow, closeFloatingWindow, isFloatingWindowOpen } from './floatingWindow'
 import { settingsKeeper } from './stateKeeper'
 
 export const ipcMainHandlersInit = (): void => {
@@ -55,4 +56,39 @@ export const ipcMainHandlersInit = (): void => {
   ipcMain.handle('getAppVersion', (): string => {
     return app.getVersion()
   })
+
+  // Floating window
+  ipcMain.handle('toggleFloatingWindow', async (_, show: boolean) => {
+    if (show) {
+      await createFloatingWindow()
+    } else {
+      closeFloatingWindow()
+    }
+  })
+
+  ipcMain.on('floating-mic-toggle', () => {
+    if (MAIN_WINDOW() && !MAIN_WINDOW().isDestroyed()) {
+      MAIN_WINDOW().webContents.send('floating-mic-toggle')
+    }
+  })
+
+  ipcMain.on('floating-restore', () => {
+    closeFloatingWindow()
+    if (MAIN_WINDOW() && !MAIN_WINDOW().isDestroyed()) {
+      MAIN_WINDOW().restore()
+      MAIN_WINDOW().focus()
+    }
+  })
+
+  ipcMain.on('floating-end', () => {
+    closeFloatingWindow()
+    if (MAIN_WINDOW() && !MAIN_WINDOW().isDestroyed()) {
+      MAIN_WINDOW().webContents.send('floating-end')
+      MAIN_WINDOW().restore()
+    }
+  })
 }
+
+// Need access to MAIN_WINDOW
+let MAIN_WINDOW: () => BrowserWindow
+export const setMainWindow = (getter: () => BrowserWindow) => { MAIN_WINDOW = getter }

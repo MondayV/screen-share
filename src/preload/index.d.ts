@@ -10,6 +10,7 @@ declare global {
   interface Window {
     electron: ElectronAPI
     PcConnectApi: {
+      toggleFloatingWindow: (show: boolean) => Promise<void>
       toggleRemoteCursors: (state: boolean) => Promise<void>
       remoteCursorPing: (cursorId: string) => Promise<void>
       updateRemoteCursor: (state: {

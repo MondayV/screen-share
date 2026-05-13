@@ -4,14 +4,7 @@
   import Host from './Host.svelte'
   import Settings from './Settings.svelte'
   import About from './About.svelte'
-  import {
-    useActiveView,
-    useNavigationEnabled,
-    useIsHosting,
-    useIsWatching,
-    useParticipantUrl,
-    useHostUrl
-  } from './stores'
+  import { useActiveView, useNavigationEnabled, useIsHosting, useIsWatching, useParticipantUrl, useHostUrl } from './stores'
   import { getDataFromPcConnectUrl } from './Utils'
   const activeView = useActiveView()
   const participantUrl = useParticipantUrl()
@@ -36,14 +29,24 @@
   }
 </script>
 
-<Navigation />
+<div class="app-shell">
+  <Navigation />
+  <div class="app-body">
+    {#if $activeView === 'join'}
+      <Join />
+    {:else if $activeView === 'host'}
+      <Host />
+    {:else if $activeView === 'settings'}
+      <Settings />
+    {:else if $activeView === 'about'}
+      <About />
+    {/if}
+  </div>
+</div>
 
-{#if $activeView === 'join'}
-  <Join />
-{:else if $activeView === 'host'}
-  <Host />
-{:else if $activeView === 'settings'}
-  <Settings />
-{:else if $activeView === 'about'}
-  <About />
-{/if}
+<style>
+  :global(*) { margin: 0; padding: 0; box-sizing: border-box; }
+  :global(body) { background: #11111b; color: #cdd6f4; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .app-shell { display: flex; flex-direction: column; height: 100vh; }
+  .app-body { flex: 1; overflow: hidden; }
+</style>

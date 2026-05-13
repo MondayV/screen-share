@@ -15,10 +15,26 @@
   let remoteCursorPositionsEnabled = false
   let remoteMouseCursorPositionsChannel: RTCDataChannel | null = null
   let remoteCursorPingChannel: RTCDataChannel | null = null
+  let annotationChannel: RTCDataChannel | null = null
+  let chatChannel: RTCDataChannel | null = null
+  let remoteControlChannel: RTCDataChannel | null = null
+  let reactionChannel: RTCDataChannel | null = null
   let audioStream: MediaStream | null = null
   let stream: MediaStream | null = null
+  let cameraStream: MediaStream | null = null
   let audioElement: HTMLAudioElement | null = null
   let userSettings: SettingsData | null = null
+
+  // Callback handlers for received data channel messages
+  let onAnnotation: ((data: any) => void) | null = null
+  let onChatMessage: ((data: any) => void) | null = null
+  let onRemoteControl: ((data: any) => void) | null = null
+  let onReaction: ((data: any) => void) | null = null
+
+  let annotationReady = (): boolean => annotationChannel?.readyState === 'open'
+  let chatReady = (): boolean => chatChannel?.readyState === 'open'
+  let remoteControlReady = (): boolean => remoteControlChannel?.readyState === 'open'
+  let reactionReady = (): boolean => reactionChannel?.readyState === 'open'
 
   const remoteMouseCursorPositionsChannelIsReady = (): boolean => {
     if (!remoteMouseCursorPositionsChannel) return false
@@ -50,6 +66,22 @@
         window.PcConnectApi.remoteCursorPing(e.data)
       }
     }
+    if (dc.label === 'annotation') {
+      annotationChannel = dc
+      dc.onmessage = (e) => { if (onAnnotation) onAnnotation(JSON.parse(e.data)) }
+    }
+    if (dc.label === 'chat') {
+      chatChannel = dc
+      dc.onmessage = (e) => { if (onChatMessage) onChatMessage(JSON.parse(e.data)) }
+    }
+    if (dc.label === 'remoteControl') {
+      remoteControlChannel = dc
+      dc.onmessage = (e) => { if (onRemoteControl) onRemoteControl(JSON.parse(e.data)) }
+    }
+    if (dc.label === 'reaction') {
+      reactionChannel = dc
+      dc.onmessage = (e) => { if (onReaction) onReaction(JSON.parse(e.data)) }
+    }
   }
   export function PingRemoteCursor(cursorId: string): void {
     if (!remoteCursorPingChannelIsReady()) {
@@ -77,7 +109,27 @@
     remoteCursorPositionsEnabled = enabled
     return enabled
   }
-  export async function Setup(v: HTMLVideoElement = null): Promise<void> {
+
+  // Annotation channel
+  export function SetOnAnnotation(cb: ((data: any) => void) | null) { onAnnotation = cb }
+  export function SendAnnotation(data: any) { if (annotationReady()) annotationChannel!.send(JSON.stringify(data)) }
+
+  // Chat channel
+  export function SetOnChatMessage(cb: ((data: any) => void) | null) { onChatMessage = cb }
+  export function SendChatMessage(data: any) { if (chatReady()) chatChannel!.send(JSON.stringify(data)) }
+
+  // Remote control channel
+  export function SetOnRemoteControl(cb: ((data: any) => void) | null) { onRemoteControl = cb }
+  export function SendRemoteControl(data: any) { if (remoteControlReady()) remoteControlChannel!.send(JSON.stringify(data)) }
+
+  // Reaction channel
+  export function SetOnReaction(cb: ((data: any) => void) | null) { onReaction = cb }
+  export function SendReaction(data: any) { if (reactionReady()) reactionChannel!.send(JSON.stringify(data)) }
+
+  // Camera stream
+  export function GetCameraStream(): MediaStream | null { return cameraStream }
+  export function HasCamera(): boolean { return cameraStream !== null && cameraStream.getVideoTracks().length > 0 }
+  export async function Setup(v: HTMLVideoElement = null, enableCamera: boolean = false): Promise<void> {
     userSettings = await window.PcConnectApi.getSettings()
     remoteVideo = v
     audioElement = document.createElement('audio')
@@ -123,11 +175,17 @@
     } catch (e) {
       errorHander(e)
     }
+    // Camera capture for PIP
+    if (enableCamera) {
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+      } catch (e) { /* camera optional */ }
+    }
     if (!remoteVideo) {
       try {
         stream = await navigator.mediaDevices.getDisplayMedia({
           video: true,
-          audio: false
+          audio: true
         })
         for (const track of stream.getTracks()) {
           pc.addTrack(track, stream)
@@ -138,6 +196,11 @@
             pc.addTrack(track, stream)
           }
         }
+        if (cameraStream) {
+          for (const track of cameraStream.getVideoTracks()) {
+            pc.addTrack(track, stream)
+          }
+        }
       } catch (e) {
         errorHander(e)
       }
@@ -145,6 +208,11 @@
       if (audioStream) {
         for (const track of audioStream.getTracks()) {
           track.enabled = userSettings.isMicrophoneEnabledOnConnect
+          pc.addTrack(track, audioStream)
+        }
+      }
+      if (cameraStream) {
+        for (const track of cameraStream.getVideoTracks()) {
           pc.addTrack(track, audioStream)
         }
       }
@@ -167,19 +235,39 @@
     return await getConnectionString(ConnectionType.PARTICIPANT, pc.localDescription, data)
   }
   export async function CreateHostOffer(): Promise<RTCSessionDescriptionOptions> {
-    remoteMouseCursorPositionsChannel = pc.createDataChannel('remoteMouseCursorPositions')
-    remoteCursorPingChannel = pc.createDataChannel('remoteCursorPing')
-    setupDataChannel(remoteMouseCursorPositionsChannel)
-    setupDataChannel(remoteCursorPingChannel)
+    if (!remoteMouseCursorPositionsChannel) {
+      remoteMouseCursorPositionsChannel = pc.createDataChannel('remoteMouseCursorPositions')
+      remoteCursorPingChannel = pc.createDataChannel('remoteCursorPing')
+      annotationChannel = pc.createDataChannel('annotation')
+      chatChannel = pc.createDataChannel('chat')
+      remoteControlChannel = pc.createDataChannel('remoteControl')
+      reactionChannel = pc.createDataChannel('reaction')
+      setupDataChannel(remoteMouseCursorPositionsChannel)
+      setupDataChannel(remoteCursorPingChannel)
+      setupDataChannel(annotationChannel)
+      setupDataChannel(chatChannel)
+      setupDataChannel(remoteControlChannel)
+      setupDataChannel(reactionChannel)
+    }
     const desc = await pc.createOffer()
     await pc.setLocalDescription(desc)
     return pc.localDescription.toJSON() as RTCSessionDescriptionOptions
   }
   export async function CreateHostUrl(data: { username: string }): Promise<string> {
-    remoteMouseCursorPositionsChannel = pc.createDataChannel('remoteMouseCursorPositions')
-    remoteCursorPingChannel = pc.createDataChannel('remoteCursorPing')
-    setupDataChannel(remoteMouseCursorPositionsChannel)
-    setupDataChannel(remoteCursorPingChannel)
+    if (!remoteMouseCursorPositionsChannel) {
+      remoteMouseCursorPositionsChannel = pc.createDataChannel('remoteMouseCursorPositions')
+      remoteCursorPingChannel = pc.createDataChannel('remoteCursorPing')
+      annotationChannel = pc.createDataChannel('annotation')
+      chatChannel = pc.createDataChannel('chat')
+      remoteControlChannel = pc.createDataChannel('remoteControl')
+      reactionChannel = pc.createDataChannel('reaction')
+      setupDataChannel(remoteMouseCursorPositionsChannel)
+      setupDataChannel(remoteCursorPingChannel)
+      setupDataChannel(annotationChannel)
+      setupDataChannel(chatChannel)
+      setupDataChannel(remoteControlChannel)
+      setupDataChannel(reactionChannel)
+    }
     const desc = await pc.createOffer()
     await pc.setLocalDescription(desc)
     return await getConnectionString(ConnectionType.HOST, pc.localDescription, data)

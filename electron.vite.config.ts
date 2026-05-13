@@ -27,7 +27,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: 'src/renderer/index.html',
-          cursors: 'src/renderer/cursors.html'
+          cursors: 'src/renderer/cursors.html',
+          floating: 'src/renderer/floating.html'
         }
       }
     },

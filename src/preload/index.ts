@@ -54,6 +54,9 @@ const PcConnectApi = {
   toggleRemoteCursors: async (state: boolean): Promise<void> => {
     ipcRenderer.invoke('toggleRemoteCursors', state)
   },
+  toggleFloatingWindow: async (show: boolean): Promise<void> => {
+    ipcRenderer.invoke('toggleFloatingWindow', show)
+  },
   remoteCursorPing: async (cursorId: string): Promise<void> => {
     ipcRenderer.invoke('remoteCursorPing', cursorId)
   },
