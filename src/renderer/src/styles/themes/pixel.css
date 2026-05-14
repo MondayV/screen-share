@@ -1,4 +1,4 @@
-/* === PIXEL — 中文可读 === */
+/* === PIXEL — 设置面板完整可读 === */
 html[data-theme="pixel"] body { background: #0F0F3D; color: #FFF; font-size: 14px; line-height: 1.7; }
 [data-theme="pixel"] {
   --bg: #0F0F3D; --bg2: #15155A; --border: #FFF;
@@ -36,11 +36,50 @@ html[data-theme="pixel"] body { background: #0F0F3D; color: #FFF; font-size: 14p
   .nav-tab { font-size: 10px; padding: 12px 16px; border: 4px solid transparent; border-radius: 0; text-transform: uppercase; color: var(--text2); }
   .nav-tab.active { border-color: var(--accent); background: rgba(0,212,255,0.15); color: var(--accent); }
 
-  .select select { background: #0A0A2A; color: var(--accent); border: 4px solid #fff; font-size: 11px; padding: 10px 36px 10px 16px; box-shadow: 4px 4px 0 #000; border-radius: 0; min-width: 200px !important; }
-  .label, label { font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; display: block !important; visibility: visible !important; opacity: 1 !important; }
-  .help { font-size: 9px; color: var(--text2); }
+  /* Settings panel — high specificity overrides for Bulma */
+  .field .label, label.label, form .label, .content .label {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: var(--accent) !important;
+    font-family: 'SimHei', 'Microsoft YaHei', 'PingFang SC', sans-serif !important;
+    font-size: 14px !important;
+    font-weight: normal !important;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+
+  .select select {
+    background: #0A0A2A; color: var(--accent);
+    border: 4px solid #fff;
+    font-family: 'SimHei', 'Microsoft YaHei', 'PingFang SC', sans-serif !important;
+    font-size: 14px !important;
+    padding: 10px 40px 10px 16px;
+    box-shadow: 4px 4px 0 #000;
+    border-radius: 0;
+    min-width: 220px !important;
+    width: auto;
+    height: auto;
+    -webkit-appearance: none;
+  }
+
+  .select select option {
+    font-family: 'SimHei', 'Microsoft YaHei', 'PingFang SC', sans-serif !important;
+    font-size: 14px !important;
+    background: #0A0A2A;
+    color: var(--text);
+    padding: 8px;
+  }
+
+  /* Other labels and text sizing */
+  .help { font-size: 11px; color: var(--text2); font-family: 'SimHei', 'Microsoft YaHei', sans-serif !important; }
   .title, h1, h2 { text-transform: uppercase; }
-  .is-size-7 { font-size: 9px; }
-  .is-size-4 { font-size: 13px; }
+  h2.label, h2 { font-size: 16px; color: var(--accent); }
+  .is-size-7 { font-size: 10px; }
+  .is-size-4 { font-size: 14px; }
   .is-size-1 { font-size: 24px; }
+
+  /* Bulma input overrides for pixel */
+  .input, .textarea { font-family: 'SimHei', 'Microsoft YaHei', sans-serif !important; font-size: 12px !important; }
 }
