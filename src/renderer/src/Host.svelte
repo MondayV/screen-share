@@ -10,6 +10,7 @@
   import QuickReactions from './QuickReactions.svelte'
   import RemoteControl from './RemoteControl.svelte'
   import RecordButton from './RecordButton.svelte'
+  import PictureInPicture from './PictureInPicture.svelte'
 
   import type { ChatMessage } from './Chat.svelte'
 
@@ -42,6 +43,7 @@
   let showChat = false
   let showAnnotation = false
   let remoteControlActive = false
+  let cameraStream: MediaStream | null = null
 
   const onConnectionStateChange = (): void => {
     switch (connectionState) {
@@ -62,11 +64,12 @@
 
   const onStartSessionButtonClick = async (): Promise<void> => {
     try {
-      await webRTCComponent.Setup(null)
+      await webRTCComponent.Setup(null, true)
       isSharing = true
       $navigationEnabled = false
       $isHosting = true
       hasAudioInput = webRTCComponent.HasAudioInput()
+      cameraStream = webRTCComponent.GetCameraStream()
       try { await window.PcConnectApi.toggleFloatingWindow(true) } catch {}
 
       const desc = await webRTCComponent.CreateHostOffer()
@@ -176,6 +179,9 @@
       </div>
     {:else}
       <div class="green-border"></div>
+      {#if cameraStream}
+        <PictureInPicture stream={cameraStream} visible={true} />
+      {/if}
     {/if}
   </div>
 

@@ -125,7 +125,9 @@
   export function SetOnReaction(cb: ((data: any) => void) | null) { onReaction = cb }
   export function SendReaction(data: any) { if (reactionReady()) reactionChannel!.send(JSON.stringify(data)) }
 
-  export async function Setup(v: HTMLVideoElement = null): Promise<void> {
+  let cameraStream: MediaStream | null = null
+  export function GetCameraStream(): MediaStream | null { return cameraStream }
+  export async function Setup(v: HTMLVideoElement = null, enableCamera: boolean = false): Promise<void> {
     userSettings = await window.PcConnectApi.getSettings()
     remoteVideo = v
     audioElement = document.createElement('audio')
@@ -170,6 +172,14 @@
       })
     } catch (e) {
       errorHander(e)
+    }
+    if (enableCamera) {
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        for (const track of cameraStream.getVideoTracks()) {
+          pc.addTrack(track, cameraStream)
+        }
+      } catch { /* camera optional */ }
     }
     if (!remoteVideo) {
       try {

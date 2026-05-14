@@ -4,6 +4,9 @@ import { createCursorsWindow } from './cursors'
 import { createFloatingWindow, closeFloatingWindow, isFloatingWindowOpen } from './floatingWindow'
 import { settingsKeeper } from './stateKeeper'
 
+let robot: any = null
+try { robot = require('robotjs') } catch { /* optional */ }
+
 export const ipcMainHandlersInit = (): void => {
   const availableDimensions = screen.getPrimaryDisplay().workAreaSize
   let remoteCursorsWindow: BrowserWindow | null = null
@@ -86,6 +89,23 @@ export const ipcMainHandlersInit = (): void => {
       MAIN_WINDOW().webContents.send('floating-end')
       MAIN_WINDOW().restore()
     }
+  })
+  // Remote control input injection
+  ipcMain.handle('remote-control-mouse', async (_, data) => {
+    if (!robot) return
+    const { x, y, button, action } = data
+    robot.moveMouse(x, y)
+    if (action === 'down') robot.mouseToggle('down', button || 'left')
+    if (action === 'up') robot.mouseToggle('up', button || 'left')
+    if (action === 'click') robot.mouseClick(button || 'left')
+  })
+
+  ipcMain.handle('remote-control-key', async (_, data) => {
+    if (!robot) return
+    const { key, action } = data
+    if (action === 'down') robot.keyToggle(key, 'down')
+    if (action === 'up') robot.keyToggle(key, 'up')
+    if (action === 'tap') robot.keyTap(key)
   })
 }
 

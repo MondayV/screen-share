@@ -1,6 +1,6 @@
 {
   "name": "pc-connect",
-  "version": "1.3.5",
+  "version": "1.4.0",
   "description": "PC Connect - 屏幕共享工具",
   "main": "./out/main/index.js",
   "author": {
@@ -24,6 +24,7 @@
     "@sweetalert2/theme-bulma": "5.0.18",
     "electron-settings": "4.0.4",
     "esbuild": "^0.28.0",
+    "robotjs": "^0.7.1",
     "sweetalert2": "11.14.5",
     "typesafe-i18n": "5.26.2",
     "ws": "^8.20.1"

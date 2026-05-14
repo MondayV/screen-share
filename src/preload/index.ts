@@ -19,6 +19,12 @@ ipcRenderer.on('openPcConnectURL', (_, url) => {
   })
 })
 
+ipcRenderer.on('signal-server-ready', (_, port) => {
+  onDocumentReady(() => {
+    window.postMessage({ type: 'signalServerReady', port }, '*')
+  })
+})
+
 type IceServer = {
   urls: string
   username?: string
@@ -55,6 +61,12 @@ const PcConnectApi = {
   },
   toggleRemoteCursors: async (state: boolean): Promise<void> => {
     ipcRenderer.invoke('toggleRemoteCursors', state)
+  },
+  remoteControlMouse: async (data: {x:number,y:number,button?:string,action:string}): Promise<void> => {
+    ipcRenderer.invoke('remote-control-mouse', data)
+  },
+  remoteControlKey: async (data: {key:string,action:string}): Promise<void> => {
+    ipcRenderer.invoke('remote-control-key', data)
   },
   toggleFloatingWindow: async (show: boolean): Promise<void> => {
     ipcRenderer.invoke('toggleFloatingWindow', show)

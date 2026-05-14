@@ -100,14 +100,6 @@ async function createWindow(): Promise<void> {
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId('net.getpcconnect')
 
-  // Auto-start signaling server
-  try {
-    const serverPort = await startSignalServer(3456)
-    console.log(`信令服务器端口: ${serverPort}`)
-  } catch (e) {
-    console.error('信令服务器启动失败', e)
-  }
-
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
@@ -116,6 +108,10 @@ app.whenReady().then(async () => {
 
   await createWindow()
   setMainWindow(() => MAIN_WINDOW)
+
+  // Notify renderer that signaling server is ready
+  const serverPort = await startSignalServer(3456)
+  MAIN_WINDOW.webContents.send('signal-server-ready', serverPort)
   const coldStartUrl = process.argv.find((arg) => arg.startsWith(CUSTOM_PROTOCOL + '://'))
   if (coldStartUrl) {
     sendOpenPcConnectUrlToRenderer(coldStartUrl)

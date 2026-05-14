@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import ColorPicker from 'svelte-awesome-color-picker'
   import { L } from './translations'
+  import { theme as themeStore, toggleTheme } from './theme'
 
   let colorPreviewIcon: HTMLElement
   let usernameValue: string = 'PC用户'
@@ -156,6 +157,15 @@
         <span class="icon is-small is-left"><i class="fas fa-server"></i></span>
       </div>
       <p class="help">屏幕共享信令服务器地址，默认 localhost:3456</p>
+    </div>
+
+    <div class="field">
+      <label class="label">主题</label>
+      <div class="control">
+        <button class="button" on:click={toggleTheme} type="button">
+          {$themeStore === 'dark' ? '🌙 深色模式' : '☀️ 浅色模式'}
+        </button>
+      </div>
     </div>
 
     <h2>{L.media()}</h2>
