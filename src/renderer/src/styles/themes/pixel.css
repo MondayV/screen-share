@@ -1,39 +1,54 @@
-/* === PIXEL — 8-bit 像素（可读字号）=== */
+/* === PIXEL — 8-bit 像素（大幅可读）=== */
+html[data-theme="pixel"] body { background: #0F0F3D; color: #FFF; font-size: 14px; line-height: 1.7; }
 [data-theme="pixel"] {
   --bg: #0F0F3D; --bg2: #15155A; --border: #FFF;
-  --text: #FFF; --text2: #BBB; --accent: #00D4FF;
+  --text: #FFF; --text2: #CCC; --accent: #00D4FF;
   --accent2: #FF6B9D; --danger: #FF3333; --success: #39FF14;
   --panel: #15155A; --shadow: 4px 4px 0 #000;
   --radius: 0; --font: 'Press Start 2P', monospace; --font-mono: monospace;
-  font-size: 12px; line-height: 1.6;
+  font-size: 14px; line-height: 1.7;
   -webkit-font-smoothing: none; image-rendering: pixelated;
 
   body::before {
-    content:''; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:0.08;
-    background-image: repeating-linear-gradient(0deg, transparent, transparent 6px, rgba(255,255,255,0.2) 6px, rgba(255,255,255,0.2) 8px),
-                      repeating-linear-gradient(90deg, transparent, transparent 6px, rgba(255,255,255,0.2) 6px, rgba(255,255,255,0.2) 8px);
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:0.06;
+    background-image: repeating-linear-gradient(0deg, transparent, transparent 8px, rgba(255,255,255,0.15) 8px, rgba(255,255,255,0.15) 10px),
+                      repeating-linear-gradient(90deg, transparent, transparent 8px, rgba(255,255,255,0.15) 8px, rgba(255,255,255,0.15) 10px);
   }
 
-  .ctrl-btn { background: var(--accent2); border: 4px solid #fff; color: #fff; border-radius: 0; box-shadow: 4px 4px 0 #000; font-family: var(--font); font-size: 9px; padding: 10px 16px; }
+  .ctrl-btn { background: var(--accent2); border: 4px solid #fff; color: #fff; border-radius: 0; box-shadow: 4px 4px 0 #000; font-family: var(--font); font-size: 11px; padding: 12px 20px; }
   .ctrl-btn:hover { background: var(--accent); }
   .ctrl-btn:active { box-shadow: none; transform: translate(4px,4px); }
   .ctrl-end { background: var(--danger) !important; }
 
-  input[type="text"], textarea, .input { background: #0A0A2A; border: 4px solid #fff; color: var(--success); font-family: var(--font); font-size: 10px; padding: 10px 14px; box-shadow: inset 4px 4px 0 #000; }
+  input[type="text"], textarea, .input { background: #0A0A2A; border: 4px solid #fff; color: var(--success); font-family: var(--font); font-size: 11px; padding: 12px 16px; box-shadow: inset 4px 4px 0 #000; }
   input:focus, .input:focus { border-color: var(--accent); }
 
   .chat-panel { background: var(--panel); border: 4px solid #fff; box-shadow: 8px 8px 0 rgba(0,0,0,0.5); }
-  .chat-header { font-family: var(--font); font-size: 10px; color: var(--accent); text-transform: uppercase; }
-  .chat-input { background: #0A0A2A; border: 4px solid #fff; color: var(--success); font-family: var(--font); font-size: 10px; padding: 10px; }
-  .notification { background: var(--panel); border: 4px solid #fff; box-shadow: 8px 8px 0 #000; border-radius: 0; color: var(--text); }
-  .msg.sent, .msg.recv { border: 4px solid #fff; border-radius: 0; box-shadow: 4px 4px 0 rgba(0,0,0,0.4); font-family: var(--font); font-size: 9px; padding: 10px 12px; }
+  .chat-header { font-family: var(--font); font-size: 11px; color: var(--accent); text-transform: uppercase; padding: 12px; }
+  .chat-input { background: #0A0A2A; border: 4px solid #fff; color: var(--success); font-family: var(--font); font-size: 10px; padding: 12px; }
+  .chat-messages { font-family: var(--font); font-size: 10px; }
+  .notification { background: var(--panel); border: 4px solid #fff; box-shadow: 8px 8px 0 #000; border-radius: 0; color: var(--text); font-family: var(--font); font-size: 10px; }
+  .msg.sent, .msg.recv { border: 4px solid #fff; border-radius: 0; box-shadow: 4px 4px 0 rgba(0,0,0,0.4); font-family: var(--font); font-size: 10px; padding: 12px 14px; }
   .msg.sent { background: var(--accent); color: #000; }
   .msg.recv { background: var(--accent2); color: #fff; }
 
-  .welcome-screen h1, .join-screen h1, .nav-logo { font-family: var(--font); font-size: 16px; color: var(--accent); text-shadow: 4px 4px 0 #000; text-transform: uppercase; }
+  .welcome-screen h1, .join-screen h1, .nav-logo { font-family: var(--font); font-size: 18px; color: var(--accent); text-shadow: 4px 4px 0 #000; text-transform: uppercase; }
   .nav-bar { background: var(--panel); border-bottom: 4px solid #fff; }
   .bottom-bar { background: var(--panel); border-top: 4px solid #fff; }
-  .nav-tab { font-family: var(--font); font-size: 9px; padding: 10px 14px; border: 4px solid transparent; border-radius: 0; text-transform: uppercase; color: var(--text2); }
+  .nav-tab { font-family: var(--font); font-size: 10px; padding: 12px 16px; border: 4px solid transparent; border-radius: 0; text-transform: uppercase; color: var(--text2); }
   .nav-tab.active { border-color: var(--accent); background: rgba(0,212,255,0.15); color: var(--accent); }
   .nav-tab:hover { border-color: #fff; color: var(--text); }
+
+  /* Theme selector — arcade dropdown */
+  .select select { background: #0A0A2A; color: var(--accent); border: 4px solid #fff; font-family: var(--font); font-size: 11px; padding: 10px 16px; box-shadow: 4px 4px 0 #000; border-radius: 0; -webkit-appearance: none; }
+  .select select:focus { border-color: var(--accent2); outline: none; }
+
+  /* Labels and text */
+  .label, label { font-family: var(--font); font-size: 10px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.05em; }
+  .help { font-family: var(--font); font-size: 9px; }
+  .title, h1, h2 { font-family: var(--font); text-transform: uppercase; }
+  .is-size-7 { font-size: 9px; }
+  .is-size-4 { font-size: 13px; }
+  .is-size-1 { font-size: 24px; }
+  .is-size-5 { font-size: 12px; }
 }
