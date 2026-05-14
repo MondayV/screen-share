@@ -2,9 +2,9 @@
   import Swal from 'sweetalert2'
 
   export let controlEnabled: boolean = false
-  export let isHost: boolean = false
+  export const isHost: boolean = false
   export let onRequestControl: (() => void) | null = null
-  export let onEndControl: (() => void) | null = null
+  export const onEndControl: (() => void) | null = null
   export let onGrantControl: (() => void) | null = null
   export let onDenyControl: (() => void) | null = null
 
