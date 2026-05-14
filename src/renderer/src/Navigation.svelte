@@ -40,14 +40,14 @@
 </div>
 
 <style>
-  .nav-bar { display: flex; align-items: center; justify-content: space-between; padding: 0 20px; height: 52px; background: #1e1e2e; border-bottom: 1px solid #313244; }
+  .nav-bar { display: flex; align-items: center; justify-content: space-between; padding: 0 20px; height: 52px; background: var(--bg2); border-bottom: 1px solid var(--border); }
   .nav-brand { display: flex; align-items: center; }
-  .nav-logo { font-weight: 700; font-size: 16px; color: #cdd6f4; }
+  .nav-logo { font-weight: 700; font-size: 16px; color: var(--text); }
   .nav-tabs { display: flex; gap: 4px; }
   .nav-actions { display: flex; gap: 4px; }
-  .nav-tab { padding: 8px 14px; border: none; border-radius: 6px; background: transparent; color: #a6adc8; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 6px; }
-  .nav-tab:hover { background: rgba(255,255,255,0.06); color: #cdd6f4; }
-  .nav-tab.active { background: rgba(137,180,250,0.15); color: #89b4fa; }
+  .nav-tab { padding: 8px 14px; border: none; border-radius: 6px; background: transparent; color: var(--text2); cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .nav-tab:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+  .nav-tab.active { background: rgba(137,180,250,0.15); color: var(--accent); }
   .nav-tab:disabled { opacity: 0.4; cursor: not-allowed; }
   .nav-tab.is-small { padding: 6px 10px; font-size: 14px; }
 </style>

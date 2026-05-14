@@ -1,0 +1,10 @@
+/* Pixel — 8-bit 像素 */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+[data-theme="pixel"] {
+  --bg: #0F0F3D; --bg2: #15155A; --border: #FFF;
+  --text: #FFF; --text2: #AAA; --accent: #00D4FF;
+  --accent2: #FF6B9D; --danger: #FF3333; --success: #39FF14;
+  --panel: #15155A; --shadow: 4px 4px 0 #000;
+  --radius: 0; --font: 'Press Start 2P', monospace; --font-mono: monospace;
+  --title-font: 'Press Start 2P', monospace;
+}

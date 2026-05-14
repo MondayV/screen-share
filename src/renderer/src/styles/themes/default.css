@@ -1,0 +1,8 @@
+/* Default — 原版浅色系 */
+[data-theme="default"] {
+  --bg: #FFFFFF; --bg2: #F5F5F5; --border: #DBDBDB;
+  --text: #363636; --text2: #7A7A7A; --accent: #3273DC;
+  --accent2: #00D1B2; --danger: #E74C3C; --success: #2ECC71;
+  --panel: #FFF; --shadow: 0 2px 4px rgba(0,0,0,0.1);
+  --radius: 4px; --font: system-ui, sans-serif; --font-mono: 'SF Mono', monospace;
+}

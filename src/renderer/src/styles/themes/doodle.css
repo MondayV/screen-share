@@ -1,0 +1,10 @@
+/* Doodle — 手账涂鸦 */
+@import url('https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Nunito:wght@400;600;700&display=swap');
+[data-theme="doodle"] {
+  --bg: #FFF8E7; --bg2: #FFFEF9; --border: rgba(180,180,200,0.2);
+  --text: #4A4A4A; --text2: #8A8A8A; --accent: #FF8C94;
+  --accent2: #6BC9F2; --danger: #FF8C94; --success: #6DD5B8;
+  --panel: #FFFEF9; --shadow: 3px 3px 0 rgba(0,0,0,0.05);
+  --radius: 20px 25px 15px 30px; --font: 'Nunito', sans-serif;
+  --font-mono: monospace; --title-font: 'Gaegu', cursive;
+}

@@ -242,9 +242,9 @@
   .video-overflow { overflow: hidden; width: 100%; height: 100%; }
   .sidebar { width: 0; overflow: hidden; transition: width 0.3s; }
   .sidebar.open { width: 300px; min-width: 300px; }
-  .bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #1e1e2e; border-top: 1px solid #313244; padding: 8px 0; z-index: 100; }
+  .bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg2); border-top: 1px solid var(--border); padding: 8px 0; z-index: 100; }
   .bottom-controls { display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap; }
-  .ctrl-btn { width: 44px; height: 44px; border: none; border-radius: 50%; background: rgba(255,255,255,0.05); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; color: #cdd6f4; }
+  .ctrl-btn { width: 44px; height: 44px; border: none; border-radius: 50%; background: rgba(255,255,255,0.05); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; color: var(--text); }
   .ctrl-btn:hover { background: rgba(255,255,255,0.1); }
   .ctrl-end { background: #e74c3c !important; color: #fff; }
 </style>

@@ -1,0 +1,10 @@
+/* Cyberpunk — 极夜霓虹 */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap');
+[data-theme="cyberpunk"] {
+  --bg: #0A0A1A; --bg2: #0F0F28; --border: #00F0FF33;
+  --text: #E0E0FF; --text2: #B0B0DD; --accent: #00F0FF;
+  --accent2: #FF007F; --danger: #FF007F; --success: #00FF88;
+  --panel: rgba(15,15,40,0.85); --shadow: 0 0 12px rgba(0,240,255,0.15);
+  --radius: 8px; --font: 'Share Tech Mono', monospace; --font-mono: 'Fira Code', monospace;
+  --title-font: 'Orbitron', sans-serif; --glow: 0 0 12px;
+}

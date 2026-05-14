@@ -1,0 +1,8 @@
+/* Dark — 深色系 */
+[data-theme="dark"] {
+  --bg: #11111b; --bg2: #1e1e2e; --border: #313244;
+  --text: #cdd6f4; --text2: #a6adc8; --accent: #89b4fa;
+  --accent2: #74c7ec; --danger: #E74C3C; --success: #2ECC71;
+  --panel: #1e1e2e; --shadow: 0 2px 8px rgba(0,0,0,0.3);
+  --radius: 8px; --font: system-ui, sans-serif; --font-mono: monospace;
+}

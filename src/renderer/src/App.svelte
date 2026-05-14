@@ -8,7 +8,12 @@
   import { useActiveView, useNavigationEnabled, useIsHosting, useIsWatching, useParticipantUrl, useHostUrl } from './stores'
   import { getDataFromPcConnectUrl } from './Utils'
   import { initSignaling, signalingState } from './signaling'
-  import { theme as themeStore, applyTheme } from './theme'
+  import { applyTheme } from './theme'
+  import './styles/themes/default.css'
+  import './styles/themes/dark.css'
+  import './styles/themes/cyberpunk.css'
+  import './styles/themes/doodle.css'
+  import './styles/themes/pixel.css'
 
   const activeView = useActiveView()
   const participantUrl = useParticipantUrl()
@@ -42,6 +47,10 @@
   })
 
   onMount(async () => {
+    // Apply saved theme
+    const savedTheme = (typeof localStorage !== 'undefined' && localStorage.getItem('pc-connect-theme')) || 'dark'
+    applyTheme(savedTheme as any)
+
     // Also try direct connection as fallback (server may already be ready)
     try {
       const settings = await window.PcConnectApi.getSettings()
@@ -78,15 +87,10 @@
 
 <style>
   :global(*) { margin: 0; padding: 0; box-sizing: border-box; }
-  :global(body) { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-  :global([data-theme="dark"]) { --bg: #11111b; --bg2: #1e1e2e; --border: #313244; --text: #cdd6f4; --text2: #a6adc8; --accent: #89b4fa; }
-  :global([data-theme="light"]) { --bg: #f5f5f5; --bg2: #ffffff; --border: #ddd; --text: #333; --text2: #666; --accent: #0066cc; }
-  :global(body) { background: var(--bg); color: var(--text); }
+  :global(body) { background: var(--bg); color: var(--text); font-family: var(--font); }
   :global(.nav-bar) { background: var(--bg2); border-color: var(--border); }
   :global(.bottom-bar) { background: var(--bg2); border-color: var(--border); }
   :global(.chat-panel) { background: var(--bg2); }
-  :global(.chat-header) { border-color: var(--border); }
-  :global(.chat-emoji-bar), :global(.chat-input-row) { border-color: var(--border); }
   :global(.reconnect-toast) { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); background: rgba(245,158,11,0.9); color: #fff; padding: 8px 20px; border-radius: 8px; z-index: 9999; font-size: 14px; }
   :global(.reconnect-failed) { background: rgba(220,38,38,0.9); }
   .app-shell { display: flex; flex-direction: column; height: 100vh; }

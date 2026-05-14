@@ -2,7 +2,7 @@
   import { onMount } from 'svelte'
   import ColorPicker from 'svelte-awesome-color-picker'
   import { L } from './translations'
-  import { theme as themeStore, toggleTheme } from './theme'
+  import { theme as themeStore, applyTheme, themeLabels } from './theme'
 
   let colorPreviewIcon: HTMLElement
   let usernameValue: string = 'PC用户'
@@ -160,12 +160,17 @@
     </div>
 
     <div class="field">
-      <label class="label">主题</label>
+      <label class="label">皮肤主题</label>
       <div class="control">
-        <button class="button" on:click={toggleTheme} type="button">
-          {$themeStore === 'dark' ? '🌙 深色模式' : '☀️ 浅色模式'}
-        </button>
+        <div class="select">
+          <select value={$themeStore} on:change={(e) => applyTheme(e.target.value)}>
+            {#each Object.entries(themeLabels) as [key, label]}
+              <option value={key}>{label}</option>
+            {/each}
+          </select>
+        </div>
       </div>
+      <p class="help">切换后即时生效，自动保存</p>
     </div>
 
     <h2>{L.media()}</h2>
