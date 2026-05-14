@@ -87,6 +87,8 @@
   :global(.chat-panel) { background: var(--bg2); }
   :global(.chat-header) { border-color: var(--border); }
   :global(.chat-emoji-bar), :global(.chat-input-row) { border-color: var(--border); }
+  :global(.reconnect-toast) { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); background: rgba(245,158,11,0.9); color: #fff; padding: 8px 20px; border-radius: 8px; z-index: 9999; font-size: 14px; }
+  :global(.reconnect-failed) { background: rgba(220,38,38,0.9); }
   .app-shell { display: flex; flex-direction: column; height: 100vh; }
   .app-body { flex: 1; overflow: hidden; }
 </style>

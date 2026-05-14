@@ -3,8 +3,16 @@
   import type { PcConnectRemoteCursorData, SettingsData } from './BananasTypes'
   import { getConnectionString, ConnectionType } from './Utils'
   import { getRTCPeerConnectionConfig } from './Config'
+  import { startRateControl, stopRateControl } from './rateController'
 
   export let connectionState: string = 'disconnected'
+  export let reconnectState: string = '' // '', 'reconnecting', 'failed'
+  export let onReconnectNeeded: (() => void) | null = null
+
+  let reconnectAttempts = 0
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  const MAX_RECONNECT = 3
+  const RECONNECT_DELAY = 3000
 
   const errorHander = (e: ErrorEvent): void => {
     console.error(e)
@@ -163,7 +171,25 @@
       }
     }
     pc.oniceconnectionstatechange = function (): void {
-      connectionState = pc.iceConnectionState
+      connectionState = pc.iceConnectionState || 'disconnected'
+      const state = connectionState
+      if (state === 'disconnected' || state === 'failed') {
+        if (reconnectAttempts < MAX_RECONNECT && !reconnectTimer) {
+          reconnectState = 'reconnecting'
+          reconnectTimer = setTimeout(() => {
+            reconnectTimer = null
+            reconnectAttempts++
+            if (onReconnectNeeded) onReconnectNeeded()
+          }, RECONNECT_DELAY)
+        } else if (reconnectAttempts >= MAX_RECONNECT) {
+          reconnectState = 'failed'
+        }
+      }
+      if (state === 'connected') {
+        reconnectState = ''
+        reconnectAttempts = 0
+        if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+      }
     }
     try {
       audioStream = await navigator.mediaDevices.getUserMedia({
@@ -207,6 +233,7 @@
         }
       }
     }
+    startRateControl(pc)
   }
   export async function CreateParticipantUrl(
     c: RTCSessionDescriptionOptions,
@@ -317,6 +344,7 @@
     return pc ? pc.connectionState === 'connected' : false
   }
   export async function Disconnect(): Promise<void> {
+    stopRateControl()
     try {
       pc.close()
       pc = null

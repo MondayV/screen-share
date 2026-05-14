@@ -44,6 +44,7 @@
   let showAnnotation = false
   let remoteControlActive = false
   let cameraStream: MediaStream | null = null
+  let reconnectState = ''
 
   const onConnectionStateChange = (): void => {
     switch (connectionState) {
@@ -102,6 +103,13 @@
 
   // Wire up data channels
   $: if (webRTCComponent && isSharing) {
+    webRTCComponent.onReconnectNeeded = async () => {
+      try {
+        const desc = await webRTCComponent.CreateHostOffer()
+        if (desc) sendSignal({ type: 'host-offer', sdp: desc, username: (await window.PcConnectApi.getSettings()).username })
+      } catch { /* reconnect failed, will retry */ }
+    }
+
     webRTCComponent.SetOnChatMessage((data: any) => { chatComponent?.receiveMessage(data) })
     webRTCComponent.SetOnReaction((data: any) => { quickReactions?.showReceivedReaction(data.emoji) })
     webRTCComponent.SetOnRemoteControl((data: any) => {
@@ -137,7 +145,7 @@
   const onSendReaction = (emoji: string) => webRTCComponent.SendReaction({ emoji, from: '我' })
 </script>
 
-<WebRTC bind:connectionState bind:this={webRTCComponent} />
+<WebRTC bind:connectionState bind:reconnectState bind:this={webRTCComponent} />
 <RemoteControl bind:this={remoteControl} isHost={true} {onRequestControl} {onGrantControl} {onDenyControl} {onEndControl} />
 
 <div class="app-layout">
@@ -181,6 +189,14 @@
       <div class="green-border"></div>
       {#if cameraStream}
         <PictureInPicture stream={cameraStream} visible={true} />
+      {/if}
+      {#if reconnectState === 'reconnecting'}
+        <div class="reconnect-toast">网络不稳定，正在重连...</div>
+      {:else if reconnectState === 'failed'}
+        <div class="reconnect-toast reconnect-failed">
+          连接丢失，请检查网络
+          <button class="button is-small is-warning ml-2" on:click={() => { if (webRTCComponent.onReconnectNeeded) webRTCComponent.onReconnectNeeded() }}>手动重试</button>
+        </div>
       {/if}
     {/if}
   </div>

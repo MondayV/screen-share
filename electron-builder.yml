@@ -34,6 +34,7 @@ nsis:
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   icon: build/icon.icns
+  category: public.app-category.utilities
   target:
     - dmg
 linux:
@@ -43,3 +44,7 @@ linux:
     - deb
   maintainer: PC Connect
   category: Utility
+publish:
+  provider: github
+  owner: MondayV
+  repo: screen-share

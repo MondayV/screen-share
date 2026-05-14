@@ -40,6 +40,7 @@
   let showAnnotation = false
   let showChat = false
   let remoteControlActive = false
+  let reconnectState = ''
 
   const onShortCodeChange = (): void => {
     const clean = shortCode.trim().toUpperCase()
@@ -100,6 +101,10 @@
       Swal.fire({ position: 'center', icon: 'error', title: '连接失败', text: data.message || '请确认连接码正确', confirmButtonText: '确定' })
       connecting = false
     })
+
+    webRTCComponent.onReconnectNeeded = () => {
+      if (shortCode) sendSignal({ type: 'join', code: shortCode.trim().toUpperCase() })
+    }
   })
 
   onDestroy(() => {
@@ -139,7 +144,7 @@
   const onSendReaction = (emoji: string) => webRTCComponent.SendReaction({ emoji, from: '我' })
 </script>
 
-<WebRTC bind:connectionState bind:this={webRTCComponent} />
+<WebRTC bind:connectionState bind:reconnectState bind:this={webRTCComponent} />
 <RemoteControl bind:this={remoteControl} isHost={false} {onRequestControl} {onEndControl} />
 
 <div class="app-layout">
@@ -168,6 +173,14 @@
         {/if}
       </div>
     {:else if isStreaming}
+      {#if reconnectState === 'reconnecting'}
+        <div class="reconnect-toast">网络不稳定，正在重连...</div>
+      {:else if reconnectState === 'failed'}
+        <div class="reconnect-toast reconnect-failed">
+          连接丢失，请检查网络
+          <button class="button is-small is-warning ml-2" on:click={() => { if (webRTCComponent.onReconnectNeeded) webRTCComponent.onReconnectNeeded() }}>手动重试</button>
+        </div>
+      {/if}
       <div class="remote-container">
         <div class="video-overflow">
           <video bind:this={remoteScreen} id="remote_screen" class="video" autoplay playsinline muted></video>
