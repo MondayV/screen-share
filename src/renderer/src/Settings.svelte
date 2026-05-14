@@ -219,9 +219,9 @@
     scrollbar-width: thin; scrollbar-color: #45475a #1e1e2e;
   }
   .settings-scroll::-webkit-scrollbar { width: 6px; }
-  .settings-scroll::-webkit-scrollbar-track { background: #1e1e2e; }
-  .settings-scroll::-webkit-scrollbar-thumb { background: #45475a; border-radius: 3px; }
-  .settings-scroll::-webkit-scrollbar-thumb:hover { background: #585b70; }
+  .settings-scroll::-webkit-scrollbar-track { background: transparent; }
+  .settings-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .settings-scroll::-webkit-scrollbar-thumb:hover { background: var(--text2); }
   span.icon i.fa-palette:before {
     color: var(--color);
     text-shadow: '-1px 0 black, 0 1px black, 1px 0 black, 0 -1px black';

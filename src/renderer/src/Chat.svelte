@@ -69,19 +69,19 @@
 {/if}
 
 <style>
-  .chat-panel { display: flex; flex-direction: column; height: 100%; background: #1e1e2e; border-radius: 8px; }
-  .chat-header { padding: 10px 14px; font-weight: 600; color: #cdd6f4; border-bottom: 1px solid #313244; }
+  .chat-panel { display: flex; flex-direction: column; height: 100%; background: var(--bg2); border-radius: 8px; }
+  .chat-header { padding: 10px 14px; font-weight: 600; color: var(--text); border-bottom: 1px solid var(--border); }
   .chat-messages { flex: 1; overflow-y: auto; padding: 10px 14px; }
   .chat-msg { margin-bottom: 8px; }
-  .msg-from { font-weight: 600; color: #89b4fa; font-size: 12px; margin-right: 6px; }
-  .msg-text { color: #cdd6f4; font-size: 13px; }
+  .msg-from { font-weight: 600; color: var(--accent); font-size: 12px; margin-right: 6px; }
+  .msg-text { color: var(--text); font-size: 13px; }
   .msg-text.emoji { font-size: 24px; }
-  .msg-time { color: #6c7086; font-size: 10px; margin-left: 8px; }
-  .chat-emoji-bar { display: flex; gap: 4px; padding: 6px 14px; border-top: 1px solid #313244; }
-  .emoji-btn { width: 28px; height: 28px; border: none; border-radius: 4px; background: transparent; font-size: 16px; cursor: pointer; }
-  .emoji-btn:hover { background: rgba(255,255,255,0.08); }
-  .chat-input-row { display: flex; gap: 6px; padding: 8px 14px; border-top: 1px solid #313244; }
-  .chat-input { flex: 1; padding: 6px 10px; border: 1px solid #45475a; border-radius: 6px; background: #11111b; color: #cdd6f4; font-size: 13px; }
-  .chat-send-btn { padding: 6px 14px; border: none; border-radius: 6px; background: #89b4fa; color: #1e1e2e; font-size: 13px; cursor: pointer; }
-  .chat-send-btn:hover { background: #74c7ec; }
+  .msg-time { color: var(--text2); font-size: 10px; margin-left: 8px; opacity: 0.7; }
+  .chat-emoji-bar { display: flex; gap: 4px; padding: 6px 14px; border-top: 1px solid var(--border); }
+  .emoji-btn { width: 28px; height: 28px; border: none; border-radius: 4px; background: transparent; font-size: 16px; cursor: pointer; color: var(--text); }
+  .emoji-btn:hover { background: rgba(128,128,128,0.15); }
+  .chat-input-row { display: flex; gap: 6px; padding: 8px 14px; border-top: 1px solid var(--border); }
+  .chat-input { flex: 1; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 13px; }
+  .chat-send-btn { padding: 6px 14px; border: none; border-radius: 6px; background: var(--accent); color: #fff; font-size: 13px; cursor: pointer; }
+  .chat-send-btn:hover { background: var(--accent2); }
 </style>

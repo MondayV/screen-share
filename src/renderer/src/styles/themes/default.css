@@ -1,4 +1,5 @@
 /* === DEFAULT — 原版浅色 === */
+html[data-theme="default"] body { background: #FFF; color: #363636; }
 [data-theme="default"] {
   --bg: #FFF; --bg2: #F5F5F5; --border: #DBDBDB;
   --text: #363636; --text2: #7A7A7A; --accent: #3273DC;
@@ -9,12 +10,12 @@
   .ctrl-btn { background: #f0f0f0; color: var(--text); }
   .ctrl-btn:hover { background: #e0e0e0; }
   .ctrl-end { background: var(--danger) !important; color: #fff; }
-  .input, input[type="text"], textarea { background: #fff; border: 1px solid #DBDBDB; color: var(--text); border-bottom-color: #DBDBDB; }
-  .input:focus, input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(50,115,220,0.15); }
+  input[type="text"], textarea, .input { background: #fff; border: 1px solid #DBDBDB; color: var(--text); border-bottom-color: #DBDBDB; }
+  input:focus, .input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(50,115,220,0.15); }
   .chat-panel { background: #fff; border: 1px solid #eee; }
   .chat-header { color: var(--text); }
   .chat-input { background: #f5f5f5; color: var(--text); }
   .welcome-screen h1, .join-screen h1 { color: var(--text); }
-  .notification { background: #fff; }
+  .notification { background: #fff; color: var(--text); }
   .settings-scroll { background: transparent; }
 }
