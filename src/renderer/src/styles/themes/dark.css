@@ -18,4 +18,4 @@
   .msg.recv { background: rgba(255,107,157,0.08); border-color: rgba(255,107,157,0.2); }
 }
 
-[data-theme="dark"] .select select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-family: var(--font); font-size: 14px; }
+[data-theme="dark"] .select select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px 36px 8px 12px; min-width: 180px; font-family: var(--font); font-size: 14px; }

@@ -21,4 +21,4 @@ html[data-theme="default"] body { background: #FFF; color: #363636; }
 }
 
 /* Theme selector */
-[data-theme="default"] .select select { background: #fff; color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; font-family: var(--font); font-size: 14px; }
+[data-theme="default"] .select select { background: #fff; color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 8px 36px 8px 12px; min-width: 180px; font-family: var(--font); font-size: 14px; }
