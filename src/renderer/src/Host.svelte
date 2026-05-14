@@ -44,6 +44,7 @@
   let showAnnotation = false
   let remoteControlActive = false
   let cameraStream: MediaStream | null = null
+  let cameraActive = false
   let reconnectState = ''
 
   const onConnectionStateChange = (): void => {
@@ -65,12 +66,11 @@
 
   const onStartSessionButtonClick = async (): Promise<void> => {
     try {
-      await webRTCComponent.Setup(null, true)
+      await webRTCComponent.Setup(null)
       isSharing = true
       $navigationEnabled = false
       $isHosting = true
       hasAudioInput = webRTCComponent.HasAudioInput()
-      cameraStream = webRTCComponent.GetCameraStream()
       try { await window.PcConnectApi.toggleFloatingWindow(true) } catch {}
 
       const desc = await webRTCComponent.CreateHostOffer()
@@ -133,6 +133,22 @@
   }
 
   const onMicrophoneToggle = () => { microphoneActive = !microphoneActive; webRTCComponent.ToggleMicrophone() }
+  const onCameraToggle = async () => {
+    if (cameraActive) {
+      cameraActive = false
+      if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null }
+      webRTCComponent.StopCamera()
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        cameraStream = stream
+        cameraActive = true
+        webRTCComponent.AddCameraTrack(stream)
+      } catch {
+        Swal.fire({ icon: 'error', title: '无法访问摄像头', text: '请检查权限设置', confirmButtonText: '确定' })
+      }
+    }
+  }
   const onDisplayStreamToggle = () => { displayStreamActive = !displayStreamActive; webRTCComponent.ToggleDisplayStream() }
   const toggleRemoteCursors = () => { cursorsActive = !cursorsActive; window.PcConnectApi.toggleRemoteCursors(cursorsActive); webRTCComponent.ToggleRemoteCursors(cursorsActive) }
 
@@ -226,6 +242,9 @@
           <i class="fas fa-comment" style="color: {showChat ? '#89b4fa' : '#aaa'}"></i>
         </button>
       {/if}
+      <button class="ctrl-btn {cameraActive ? '' : 'ctrl-off'}" title="摄像头" on:click={onCameraToggle}>
+        <i class="fas fa-video{cameraActive ? '' : '-slash'}"></i>
+      </button>
       <button class="ctrl-btn ctrl-end" title="结束共享" on:click={onDisconnectClick}>
         <i class="fas fa-phone-slash"></i>
       </button>

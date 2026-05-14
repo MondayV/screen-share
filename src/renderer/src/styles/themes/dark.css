@@ -19,3 +19,4 @@
 }
 
 [data-theme="dark"] .select select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px 36px 8px 12px; min-width: 180px; font-family: var(--font); font-size: 14px; }
+.ctrl-off { opacity: 0.4; }

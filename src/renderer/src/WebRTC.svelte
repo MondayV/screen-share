@@ -135,6 +135,14 @@
 
   let cameraStream: MediaStream | null = null
   export function GetCameraStream(): MediaStream | null { return cameraStream }
+  export function AddCameraTrack(s: MediaStream) {
+    cameraStream = s
+    if (!pc || pc.connectionState !== 'connected') return
+    s.getVideoTracks().forEach(t => { try { pc.addTrack(t, s) } catch {} })
+  }
+  export function StopCamera() {
+    if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null }
+  }
   export async function Setup(v: HTMLVideoElement = null, enableCamera: boolean = false): Promise<void> {
     userSettings = await window.PcConnectApi.getSettings()
     remoteVideo = v

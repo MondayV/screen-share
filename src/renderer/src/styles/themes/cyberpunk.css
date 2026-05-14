@@ -58,3 +58,4 @@ html[data-theme="cyberpunk"] body { background: #0A0A1A; color: #E0E0FF; }
   .is-size-7 { font-size: 11px; }
   .is-size-4 { font-size: 16px; }
 }
+.ctrl-off { opacity: 0.4; }

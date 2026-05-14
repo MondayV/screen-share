@@ -83,3 +83,4 @@ html[data-theme="pixel"] body { background: #0F0F3D; color: #FFF; font-size: 14p
   /* Bulma input overrides for pixel */
   .input, .textarea { font-family: 'SimHei', 'Microsoft YaHei', sans-serif !important; font-size: 12px !important; }
 }
+.ctrl-off { opacity: 0.4; }

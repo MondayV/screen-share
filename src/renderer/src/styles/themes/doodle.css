@@ -40,3 +40,4 @@
 }
 
 [data-theme="doodle"] .select select { background: #fff; color: var(--text); border: 2px dashed rgba(180,180,200,0.4); border-radius: 14px; padding: 8px 36px 8px 14px; min-width: 180px; font-family: var(--font); font-size: 15px; font-weight: 600; }
+.ctrl-off { opacity: 0.4; }
