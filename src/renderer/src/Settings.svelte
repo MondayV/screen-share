@@ -6,10 +6,8 @@
   let colorPreviewIcon: HTMLElement
   let usernameValue: string = 'PC用户'
   let colorValue: string = '#ffffff'
-  let language = 'zh'
   let serverUrlValue = 'http://localhost:3456'
   let isServerUrlValid = true
-  const languageOptions = ['zh']
   let iceServersValue: string = '{ "urls": "stun:stun.l.google.com:19302" }'
   let isUsernameValid = false
   let isColorValid = false
@@ -63,7 +61,6 @@
       await window.PcConnectApi.updateSettings({
         username: usernameValue,
         color: colorValue,
-        language,
         serverUrl: serverUrlValue,
         isMicrophoneEnabledOnConnect,
         iceServers: iceServersValue.split('\n').map((srv) => JSON.parse(srv))
@@ -83,7 +80,6 @@
     const settings = await window.PcConnectApi.getSettings()
     usernameValue = settings.username
     colorValue = settings.color
-    language = settings.language
     serverUrlValue = settings.serverUrl || 'http://localhost:3456'
     isMicrophoneEnabledOnConnect = settings.isMicrophoneEnabledOnConnect
     iceServersValue = settings.iceServers.map((srv) => JSON.stringify(srv)).join('\n')
@@ -147,23 +143,6 @@
         <ColorPicker bind:hex={colorValue} isTextInput={false} isAlpha={false} />
       </div>
     </div>
-    <div class="field">
-      <label class="label" for="translation">{L.language()}</label>
-      <div class="control has-icons-left has-icons-right">
-        <div class="select">
-          <select bind:value={language}>
-            {#each languageOptions as lang}
-              <option>{lang}</option>
-            {/each}
-          </select>
-        </div>
-        <span class="icon is-small is-left">
-          <i class="fa fa-language"></i>
-        </span>
-      </div>
-      <p class="help">{L.language_description()}</p>
-    </div>
-
     <div class="field">
       <label class="label" for="serverUrl">信令服务器地址</label>
       <div class="control has-icons-left has-icons-right">

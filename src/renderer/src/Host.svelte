@@ -29,6 +29,14 @@
   let isStreaming = false
   let isSharing = false
   let shortCode = ''
+  let codeCopied = false
+
+  const copyCode = () => {
+    if (!shortCode) return
+    navigator.clipboard.writeText(shortCode)
+    codeCopied = true
+    setTimeout(() => codeCopied = false, 2000)
+  }
   let hasAudioInput = false
   let visualizerIsActive = true
   let showChat = false
@@ -158,7 +166,11 @@
         <div class="notification is-info is-light">
           <p class="is-size-4 has-text-weight-bold mb-2">连接码</p>
           <p class="is-size-1 has-text-weight-bold has-text-centered my-4" style="letter-spacing: 0.3em; font-family: monospace;">{shortCode || '...'}</p>
-          <p class="is-size-7">将 6 位码发送给对方，等待连接</p>
+          <button class="button is-info is-small" on:click={copyCode} disabled={!shortCode}>
+            <span class="icon"><i class="fas {codeCopied ? 'fa-check' : 'fa-copy'}"></i></span>
+            <span>{codeCopied ? '已复制' : '复制连接码'}</span>
+          </button>
+          <p class="is-size-7 mt-2">将 6 位码发送给对方，等待连接</p>
         </div>
         <button class="button is-danger is-small mt-2" on:click={onDisconnectClick}>取消</button>
       </div>
