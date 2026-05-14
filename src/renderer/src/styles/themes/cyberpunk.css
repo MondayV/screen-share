@@ -1,10 +1,48 @@
-/* Cyberpunk — 极夜霓虹 */
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap');
+/* === CYBERPUNK — 极夜霓虹 === */
 [data-theme="cyberpunk"] {
   --bg: #0A0A1A; --bg2: #0F0F28; --border: #00F0FF33;
   --text: #E0E0FF; --text2: #B0B0DD; --accent: #00F0FF;
   --accent2: #FF007F; --danger: #FF007F; --success: #00FF88;
   --panel: rgba(15,15,40,0.85); --shadow: 0 0 12px rgba(0,240,255,0.15);
   --radius: 8px; --font: 'Share Tech Mono', monospace; --font-mono: 'Fira Code', monospace;
-  --title-font: 'Orbitron', sans-serif; --glow: 0 0 12px;
+
+  /* Scanline overlay */
+  body::after {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:9999;
+    background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,240,255,0.02) 3px, rgba(0,240,255,0.02) 6px);
+  }
+  /* Moving grid */
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:0.06;
+    background-image: linear-gradient(rgba(0,240,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(0,240,255,0.3) 1px, transparent 1px);
+    background-size: 60px 60px; animation: cyberGrid 15s linear infinite;
+  }
+  @keyframes cyberGrid { 100% { background-position: 60px 60px; } }
+
+  /* Neon buttons */
+  .ctrl-btn { background: rgba(0,240,255,0.06); border: 1px solid rgba(0,240,255,0.25); color: var(--accent); text-shadow: 0 0 6px var(--accent); }
+  .ctrl-btn:hover { border-color: var(--accent); box-shadow: 0 0 16px rgba(0,240,255,0.3), inset 0 0 8px rgba(0,240,255,0.06); }
+  .ctrl-end { background: var(--danger) !important; border-color: var(--danger); color: #fff; }
+  button:not(.ctrl-btn):not(.nav-tab):not(.btn):not(.chat-send-btn):not(.emoji-btn) { 
+    background: rgba(0,240,255,0.06); border: 1px solid rgba(0,240,255,0.3); color: var(--accent); border-radius: var(--radius); 
+  }
+
+  /* Neon inputs */
+  input[type="text"], textarea, .input { background: rgba(10,10,30,0.7); border: none; border-bottom: 2px solid var(--accent); color: var(--text); }
+  input:focus, .input:focus { border-bottom-color: var(--accent2); box-shadow: 0 4px 12px rgba(0,240,255,0.1); }
+
+  /* Neon panels */
+  .chat-panel { background: rgba(15,15,40,0.9); border: 1px solid rgba(0,240,255,0.15); }
+  .chat-header { color: var(--accent); text-shadow: 0 0 6px var(--accent); border-bottom: 1px solid rgba(0,240,255,0.1); }
+  .chat-input { background: rgba(0,0,0,0.4); border-color: rgba(0,240,255,0.2); color: var(--text); }
+  .notification { background: rgba(15,15,40,0.95); border: 1px solid var(--accent); box-shadow: 0 0 16px rgba(0,240,255,0.2); }
+  .msg.sent { background: rgba(0,240,255,0.08); border: 1px solid rgba(0,240,255,0.2); color: var(--accent); }
+  .msg.recv { background: rgba(255,0,127,0.06); border: 1px solid rgba(255,0,127,0.2); color: var(--text); }
+
+  /* Glitch heading */
+  .welcome-screen h1, .join-screen h1, .nav-logo { 
+    font-family: 'Orbitron', sans-serif; text-shadow: 0 0 10px var(--accent), 0 0 20px rgba(0,240,255,0.3); letter-spacing: 0.06em; 
+  }
+  .nav-bar { border-bottom-color: rgba(0,240,255,0.15); }
+  .bottom-bar { border-top-color: rgba(0,240,255,0.15); }
 }
