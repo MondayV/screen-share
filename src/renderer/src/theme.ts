@@ -5,7 +5,7 @@ export type ThemeName = 'default' | 'dark' | 'cyberpunk' | 'doodle' | 'pixel'
 export const themeLabels: Record<ThemeName, string> = {
   default: '默认浅色',
   dark: '深色模式',
-  cyberpunk: '极夜霓虹',
+  cyberpunk: '赛博朋克',
   doodle: '手账涂鸦',
   pixel: '像素比特'
 }
