@@ -98,6 +98,7 @@
     })
 
     onSignalMessage('error', (data) => {
+      console.error('[Join] 信令错误:', data.message, '完整数据:', JSON.stringify(data))
       Swal.fire({ position: 'center', icon: 'error', title: '连接失败', text: data.message || '请确认连接码正确', confirmButtonText: '确定' })
       connecting = false
     })
@@ -114,8 +115,10 @@
 
   const onConnectClick = async (): Promise<void> => {
     if (!codeValid) return
+    const code = shortCode.trim().toUpperCase()
+    console.log('[Join] 发送加入请求:', code)
     connecting = true
-    sendSignal({ type: 'join', code: shortCode.trim().toUpperCase() })
+    sendSignal({ type: 'join', code })
   }
 
   const reset = (): void => {

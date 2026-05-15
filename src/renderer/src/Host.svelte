@@ -76,6 +76,7 @@
       const desc = await webRTCComponent.CreateHostOffer()
       if (desc) {
         const settings = await window.PcConnectApi.getSettings()
+        console.log('[Host] 发送host-offer, 创建房间...')
         sendSignal({ type: 'host-offer', sdp: desc, username: settings.username })
       }
     } catch (e) {
@@ -106,7 +107,10 @@
     webRTCComponent.onReconnectNeeded = async () => {
       try {
         const desc = await webRTCComponent.CreateHostOffer()
-        if (desc) sendSignal({ type: 'host-offer', sdp: desc, username: (await window.PcConnectApi.getSettings()).username })
+        if (desc) {
+          const settings = await window.PcConnectApi.getSettings()
+          sendSignal({ type: 'host-offer', code: shortCode, sdp: desc, username: settings.username })
+        }
       } catch { /* reconnect failed, will retry */ }
     }
 
