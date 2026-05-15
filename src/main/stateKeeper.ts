@@ -42,9 +42,8 @@ export const settingsKeeper = async (): Promise<Settings> => {
     serverUrl: 'http://localhost:3456',
     isMicrophoneEnabledOnConnect: true,
     iceServers: [
-      {
-        urls: 'stun:stun.l.google.com:19302'
-      }
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
     ]
   }
 

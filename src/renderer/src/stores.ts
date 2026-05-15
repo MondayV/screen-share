@@ -12,3 +12,5 @@ export const useIsWatching = (): Writable<boolean> => useWritable('useIsWatching
 export const useHostUrl = (): Writable<string> => useWritable('useHostUrl', '')
 
 export const useParticipantUrl = (): Writable<string> => useWritable('useParticipantUrl', '')
+
+export const usePendingJoinCode = (): Writable<string> => useWritable('pendingJoinCode', '')

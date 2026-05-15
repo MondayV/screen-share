@@ -35,6 +35,9 @@ const PcConnectApi = {
   getAppVersion: async (): Promise<string> => {
     return await ipcRenderer.invoke('getAppVersion')
   },
+  getLocalIPs: async (): Promise<string[]> => {
+    return await ipcRenderer.invoke('getLocalIPs')
+  },
   handleUrlClicks: (state: boolean | undefined): boolean => {
     if (state) HANDLE_URL_CLICKS = state
     return HANDLE_URL_CLICKS

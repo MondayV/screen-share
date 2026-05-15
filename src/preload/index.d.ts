@@ -37,6 +37,7 @@ declare global {
         iceServers: IceServer[]
       }>
       getAppVersion: () => Promise<string>
+      getLocalIPs: () => Promise<string[]>
     }
   }
 }

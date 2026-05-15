@@ -5,9 +5,9 @@
   import Host from './Host.svelte'
   import Settings from './Settings.svelte'
   import About from './About.svelte'
-  import { useActiveView, useNavigationEnabled, useIsHosting, useIsWatching, useParticipantUrl, useHostUrl } from './stores'
-  import { getDataFromPcConnectUrl } from './Utils'
-  import { initSignaling, signalingState } from './signaling'
+  import { useActiveView, useNavigationEnabled, useIsHosting, useIsWatching, useParticipantUrl, useHostUrl, usePendingJoinCode } from './stores'
+  import { getDataFromPcConnectUrl, parseShortLink } from './Utils'
+  import { initSignaling, destroySignaling, signalingState } from './signaling'
   import { applyTheme } from './theme'
   import './styles/themes/default.css'
   import './styles/themes/dark.css'
@@ -19,21 +19,55 @@
   const participantUrl = useParticipantUrl()
   const hostUrl = useHostUrl()
   const isHosting = useIsHosting()
+  const pendingJoinCode = usePendingJoinCode()
   useNavigationEnabled()
   useIsWatching()
 
   window.onmessage = async (evt: MessageEvent): Promise<void> => {
     const { data } = evt
     if (data.type !== 'openPcConnectURL') return
-    const urlData = await getDataFromPcConnectUrl(data.url)
+    const url = data.url as string
+
+    // Try short-code format first: pc://CODE@HOST:PORT
+    const parsed = parseShortLink(url)
+    if (parsed && parsed.serverHost) {
+      const wsUrl = `ws://${parsed.serverHost}:${parsed.serverPort || 3456}`
+      console.log('[App] 连接到远程信令服务器:', wsUrl)
+      destroySignaling()
+      initSignaling(wsUrl)
+      // Wait for signaling to connect, then set join code
+      const checkAndJoin = () => {
+        const unsub = signalingState.subscribe((state) => {
+          if (state === 'connected') {
+            unsub()
+            $pendingJoinCode = parsed.code
+            $activeView = 'join'
+          }
+        })
+        // Fallback after 3 seconds
+        setTimeout(() => { unsub(); $pendingJoinCode = parsed.code; $activeView = 'join' }, 3000)
+      }
+      setTimeout(checkAndJoin, 500)
+      return
+    }
+
+    if (parsed && !parsed.serverHost) {
+      // Short code only (same machine): auto-fill join
+      $pendingJoinCode = parsed.code
+      $activeView = 'join'
+      return
+    }
+
+    // Legacy long pc://h/<token> or pc://p/<token> format
+    const urlData = await getDataFromPcConnectUrl(url)
     switch (urlData.type) {
       case 'host':
         $activeView = 'join'
-        $participantUrl = data.url
+        $participantUrl = url
         break
       case 'participant':
         if ($activeView !== 'host' || !$isHosting) return
-        $hostUrl = data.url
+        $hostUrl = url
         break
     }
   }

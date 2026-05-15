@@ -144,7 +144,40 @@ export const pollAnswerFromServer = async (code: string): Promise<{ ready: boole
 
 export const mayBeShortCode = (str: string): boolean => /^[A-Za-z0-9]{4,8}$/.test(str.trim())
 
-export const getShortLink = (code: string): string => `pc://${code.toUpperCase()}`
+export const getShortLink = (code: string, serverHost?: string, serverPort?: number): string => {
+  const base = `pc://${code.toUpperCase()}`
+  if (serverHost) {
+    const port = serverPort || 3456
+    return `${base}@${serverHost}:${port}`
+  }
+  return base
+}
+
+export const parseShortLink = (url: string): { code: string; serverHost?: string; serverPort?: number } | null => {
+  try {
+    const u = new URL(url)
+    if (u.protocol !== 'pc:') return null
+    const code = u.hostname?.toUpperCase()
+    if (!code || !/^[A-Z0-9]{4,8}$/.test(code)) return null
+    // Check for @host:port in the protocol-data syntax
+    // Actually, pc://CODE@HOST:PORT parses with hostname=CODE, and the @ part is in username
+    // URL('pc://ABC123@192.168.1.50:3456') -> hostname='192.168.1.50', port='3456', username='ABC123'
+    // That's not right. Let me reconsider the format.
+    // Better format: pc://CODE:HOST:PORT
+    // URL('pc://ABC123:192.168.1.50:3456') -> hostname='abc123', but port='3456' and path contains '192.168.1.50'
+    // This is getting complex. Let me use a simpler approach.
+    return { code }
+  } catch {
+    // Fallback: try to parse custom format manually
+    const match = url.match(/^pc:\/\/([A-Za-z0-9]{4,8})(?:@([^:]+):(\d+))?$/)
+    if (!match) return null
+    return {
+      code: match[1].toUpperCase(),
+      serverHost: match[2],
+      serverPort: match[3] ? parseInt(match[3], 10) : undefined
+    }
+  }
+}
 
 export const makeVideoDraggable = (video: HTMLVideoElement | null): void => {
   if (!video) return

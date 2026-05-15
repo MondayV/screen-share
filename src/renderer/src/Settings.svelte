@@ -9,7 +9,7 @@
   let colorValue: string = '#ffffff'
   let serverUrlValue = 'http://localhost:3456'
   let isServerUrlValid = true
-  let iceServersValue: string = '{ "urls": "stun:stun.l.google.com:19302" }'
+  let iceServersValue: string = '{ "urls": "stun:stun.l.google.com:19302" }\n{ "urls": "stun:stun1.l.google.com:19302" }'
   let isUsernameValid = false
   let isColorValid = false
   let isIceServersValid = true
@@ -198,7 +198,7 @@
           bind:value={iceServersValue}
           class="textarea {isIceServersValid ? 'is-success' : 'is-danger'}"
           id="ice_servers"
-          placeholder="&#123; &quot;urls&quot;: &quot;stun:stun.l.google.com:19302&quot; &#125;"
+          placeholder="&#123; &quot;urls&quot;: &quot;stun:stun.l.google.com:19302&quot; &#125;&#10;&#123; &quot;urls&quot;: &quot;turn:your-turn-server:3478&quot;, &quot;username&quot;: &quot;user&quot;, &quot;credential&quot;: &quot;pass&quot; &#125;"
         ></textarea>
       </div>
     </div>

@@ -3,6 +3,7 @@ import { app, BrowserWindow, ipcMain, screen } from 'electron'
 import { createCursorsWindow } from './cursors'
 import { createFloatingWindow, closeFloatingWindow, isFloatingWindowOpen } from './floatingWindow'
 import { settingsKeeper } from './stateKeeper'
+import os from 'os'
 
 let robot: any = null
 try { robot = require('robotjs') } catch { /* optional */ }
@@ -58,6 +59,20 @@ export const ipcMainHandlersInit = (): void => {
   })
   ipcMain.handle('getAppVersion', (): string => {
     return app.getVersion()
+  })
+
+  ipcMain.handle('getLocalIPs', (): string[] => {
+    const interfaces = os.networkInterfaces()
+    const ips: string[] = []
+    for (const [, addrs] of Object.entries(interfaces)) {
+      if (!addrs) continue
+      for (const addr of addrs) {
+        if (addr.family === 'IPv4' && !addr.internal) {
+          ips.push(addr.address)
+        }
+      }
+    }
+    return ips
   })
 
   // Floating window

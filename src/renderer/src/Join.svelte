@@ -3,7 +3,7 @@
   import Swal from 'sweetalert2'
   import { L } from './translations'
   import { makeVideoDraggable, mayBeShortCode, getUUIDv4 } from './Utils'
-  import { useNavigationEnabled, useIsWatching, useParticipantUrl } from './stores'
+  import { useNavigationEnabled, useIsWatching, useParticipantUrl, usePendingJoinCode } from './stores'
   import { signalingState, sendSignal, onSignalMessage, offSignalMessage } from './signaling'
   import WebRTC from './WebRTC.svelte'
   import AudioVisualizer from './AudioVisualizer.svelte'
@@ -18,6 +18,7 @@
 
   const navigationEnabled = useNavigationEnabled()
   const isWatching = useIsWatching()
+  const pendingJoinCode = usePendingJoinCode()
 
   let connectionState = 'disconnected'
   let webRTCComponent: WebRTC
@@ -71,6 +72,13 @@
   onMount(async () => {
     const settings = await window.PcConnectApi.getSettings()
     microphoneActive = settings.isMicrophoneEnabledOnConnect
+
+    // Auto-fill code from pc:// URL
+    if ($pendingJoinCode) {
+      shortCode = $pendingJoinCode
+      $pendingJoinCode = '' // Clear after use
+    }
+
     makeVideoDraggable(remoteScreen)
     if (remoteScreen) {
       remoteScreen.addEventListener('dblclick', () => webRTCComponent.PingRemoteCursor('cursor-' + UUID))
@@ -87,7 +95,7 @@
         await webRTCComponent.Setup(remoteScreen, false)
         const answer = await webRTCComponent.ConnectAndGetAnswer(data.sdp)
         const s = await window.PcConnectApi.getSettings()
-        sendSignal({ type: 'participant-answer', code: shortCode.trim().toUpperCase(), sdp: answer, username: s.username })
+        sendSignal({ type: 'participant-answer', roomId: shortCode.trim().toUpperCase(), sdp: answer, username: s.username })
         isConnected = true
         $isWatching = true
         $navigationEnabled = false
@@ -104,7 +112,7 @@
     })
 
     webRTCComponent.onReconnectNeeded = () => {
-      if (shortCode) sendSignal({ type: 'join', code: shortCode.trim().toUpperCase() })
+      if (shortCode) sendSignal({ type: 'join', roomId: shortCode.trim().toUpperCase() })
     }
   })
 
@@ -115,10 +123,10 @@
 
   const onConnectClick = async (): Promise<void> => {
     if (!codeValid) return
-    const code = shortCode.trim().toUpperCase()
-    console.log('[Join] 发送加入请求:', code)
+    const roomId = shortCode.trim().toUpperCase()
+    console.log('[Join] 发送加入请求:', roomId)
     connecting = true
-    sendSignal({ type: 'join', code })
+    sendSignal({ type: 'join', roomId })
   }
 
   const reset = (): void => {
