@@ -41,6 +41,9 @@ const PcConnectApi = {
   getSignalingAddress: async (): Promise<string> => {
     return await ipcRenderer.invoke('get-signaling-address')
   },
+  isTestMode: async (): Promise<boolean> => {
+    return await ipcRenderer.invoke('isTestMode')
+  },
   handleUrlClicks: (state: boolean | undefined): boolean => {
     if (state) HANDLE_URL_CLICKS = state
     return HANDLE_URL_CLICKS

@@ -1,6 +1,13 @@
 import os from 'os'
 
+export function isTestMode(): boolean {
+  return process.argv.some((arg) => arg.includes('test2'))
+}
+
 export function getLocalIP(): string {
+  // Dual-instance test: both on same machine, always use localhost
+  if (isTestMode()) return '127.0.0.1'
+
   const interfaces = os.networkInterfaces()
   const skipKeywords = [
     'virtual', 'vmware', 'hyper-v', 'vbox', 'loopback',

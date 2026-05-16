@@ -7,6 +7,7 @@ import { windowStateKeeper } from './stateKeeper'
 import { ipcMainHandlersInit, setMainWindow } from './ipcMainHandlers'
 import { isInProductionMode } from './utils'
 import { startSignalServer, stopSignalServer } from './signalServer'
+import { isTestMode } from './local-ip'
 
 const CUSTOM_PROTOCOL = 'pcconnect'
 
@@ -110,7 +111,14 @@ app.whenReady().then(async () => {
   setMainWindow(() => MAIN_WINDOW)
 
   // Notify renderer that signaling server is ready
-  const serverPort = await startSignalServer(3456)
+  // Test instance: skip own server, reuse main instance's port 3456
+  let serverPort: number
+  if (isTestMode()) {
+    console.log('[主进程] 测试模式，跳过信令服务器启动，复用主实例端口 3456')
+    serverPort = 3456
+  } else {
+    serverPort = await startSignalServer(3456)
+  }
   MAIN_WINDOW.webContents.send('signal-server-ready', serverPort)
   const coldStartUrl = process.argv.find((arg) => arg.startsWith(CUSTOM_PROTOCOL + '://'))
   if (coldStartUrl) {

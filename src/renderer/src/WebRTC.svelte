@@ -13,6 +13,8 @@
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   const MAX_RECONNECT = 3
   const RECONNECT_DELAY = 3000
+  let iceCheckingTimer: ReturnType<typeof setTimeout> | null = null
+  let iceCheckingNotified = false
 
   const errorHander = (e: ErrorEvent): void => {
     console.error(e)
@@ -181,7 +183,26 @@
     pc.oniceconnectionstatechange = function (): void {
       connectionState = pc.iceConnectionState || 'disconnected'
       const state = connectionState
-      if (state === 'disconnected' || state === 'failed') {
+
+      // ICE checking timeout: restart ICE if stuck >10s
+      if (state === 'checking') {
+        if (!iceCheckingTimer) {
+          iceCheckingTimer = setTimeout(() => {
+            iceCheckingTimer = null
+            if (pc && pc.iceConnectionState === 'checking') {
+              console.log('[ICE] 检测超时，重启 ICE')
+              try { pc.restartIce() } catch {}
+            }
+          }, 10000)
+        }
+      } else {
+        if (iceCheckingTimer) { clearTimeout(iceCheckingTimer); iceCheckingTimer = null }
+      }
+
+      if (state === 'failed') {
+        console.log('[ICE] 连接失败，尝试重启 ICE')
+        if (iceCheckingTimer) { clearTimeout(iceCheckingTimer); iceCheckingTimer = null }
+        try { pc.restartIce() } catch {}
         if (reconnectAttempts < MAX_RECONNECT && !reconnectTimer) {
           reconnectState = 'reconnecting'
           reconnectTimer = setTimeout(() => {
@@ -193,9 +214,25 @@
           reconnectState = 'failed'
         }
       }
+
+      if (state === 'disconnected') {
+        if (iceCheckingTimer) { clearTimeout(iceCheckingTimer); iceCheckingTimer = null }
+        if (reconnectAttempts < MAX_RECONNECT && !reconnectTimer) {
+          reconnectState = 'reconnecting'
+          reconnectTimer = setTimeout(() => {
+            reconnectTimer = null
+            reconnectAttempts++
+            if (onReconnectNeeded) onReconnectNeeded()
+          }, RECONNECT_DELAY)
+        } else if (reconnectAttempts >= MAX_RECONNECT) {
+          reconnectState = 'failed'
+        }
+      }
+
       if (state === 'connected') {
         reconnectState = ''
         reconnectAttempts = 0
+        if (iceCheckingTimer) { clearTimeout(iceCheckingTimer); iceCheckingTimer = null }
         if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
       }
     }

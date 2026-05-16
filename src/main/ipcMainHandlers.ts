@@ -80,6 +80,10 @@ export const ipcMainHandlersInit = (): void => {
     return `ws://${getLocalIP()}:3456`
   })
 
+  ipcMain.handle('isTestMode', async (): Promise<boolean> => {
+    return process.argv.some((arg) => arg.includes('test2'))
+  })
+
   // Floating window
   ipcMain.handle('toggleFloatingWindow', async (_, show: boolean) => {
     if (show) {

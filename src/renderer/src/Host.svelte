@@ -31,22 +31,12 @@
   let isSharing = false
   let shortCode = ''
   let codeCopied = false
-  let lanIPs: string[] = []
-  let shareUrlCopied = false
-  let signalingPort = 3456
 
   const copyCode = () => {
     if (!shortCode) return
     navigator.clipboard.writeText(shortCode)
     codeCopied = true
     setTimeout(() => codeCopied = false, 2000)
-  }
-
-  const copyShareUrl = (ip: string) => {
-    const url = `pc://${shortCode}@${ip}:${signalingPort}`
-    navigator.clipboard.writeText(url)
-    shareUrlCopied = true
-    setTimeout(() => shareUrlCopied = false, 2000)
   }
   let hasAudioInput = false
   let visualizerIsActive = true
@@ -97,16 +87,9 @@
 
   // Handle WebSocket signaling messages
   onMount(() => {
-    onSignalMessage('code', async (data) => {
+    onSignalMessage('code', (data) => {
       shortCode = data.roomId || data.code
       $connectionString = data.roomId || data.code
-      // Detect LAN IPs for cross-computer sharing
-      try {
-        lanIPs = await window.PcConnectApi.getLocalIPs()
-        const settings = await window.PcConnectApi.getSettings()
-        const portMatch = settings.serverUrl.match(/:(\d+)/)
-        if (portMatch) signalingPort = parseInt(portMatch[1], 10)
-      } catch { /* non-critical */ }
     })
 
     onSignalMessage('participant-answer', async (data) => {
@@ -219,20 +202,6 @@
             <span>{codeCopied ? '已复制' : '复制连接码'}</span>
           </button>
           <p class="is-size-7 mt-2">将连接码发送给对方，等待连接</p>
-          {#if lanIPs.length > 0}
-            <div class="lan-info mt-3">
-              <p class="is-size-7 has-text-weight-semibold">局域网共享链接（同WiFi/网络下可用）:</p>
-              {#each lanIPs as ip}
-                <div class="lan-url-row">
-                  <code class="lan-url">pc://{shortCode}@{ip}:{signalingPort}</code>
-                  <button class="button is-small is-light" on:click={() => copyShareUrl(ip)}>
-                    <span class="icon"><i class="fas {shareUrlCopied ? 'fa-check' : 'fa-copy'}"></i></span>
-                  </button>
-                </div>
-              {/each}
-              <p class="is-size-7 mt-1 has-text-grey">对方点击链接或输入连接码后，需在设置中将信令服务器改为 <code>{lanIPs[0]}:{signalingPort}</code></p>
-            </div>
-          {/if}
         </div>
         <button class="button is-danger is-small mt-2" on:click={onDisconnectClick}>取消</button>
       </div>
@@ -302,7 +271,4 @@
   .ctrl-btn { width: 48px; height: 48px; border: none; border-radius: 50%; background: rgba(255,255,255,0.05); cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; color: var(--text); }
   .ctrl-btn:hover { background: rgba(255,255,255,0.1); }
   .ctrl-end { background: #e74c3c !important; color: #fff; }
-  .lan-info { text-align: left; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px; }
-  .lan-url-row { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
-  .lan-url { font-size: 0.8em; word-break: break-all; padding: 4px 8px; background: rgba(0,0,0,0.15); border-radius: 4px; display: block; }
 </style>

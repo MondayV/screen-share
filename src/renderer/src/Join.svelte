@@ -4,7 +4,7 @@
   import { L } from './translations'
   import { makeVideoDraggable, mayBeShortCode, getUUIDv4 } from './Utils'
   import { useNavigationEnabled, useIsWatching, useParticipantUrl, usePendingJoinCode } from './stores'
-  import { signalingState, sendSignal, onSignalMessage, offSignalMessage } from './signaling'
+  import { signalingState, sendSignal, onSignalMessage, offSignalMessage, initSignaling } from './signaling'
   import WebRTC from './WebRTC.svelte'
   import AudioVisualizer from './AudioVisualizer.svelte'
   import Annotation from './Annotation.svelte'
@@ -36,6 +36,8 @@
   let codeValid: boolean | null = null
   let codeError = ''
   let connecting = false
+  let connectTimeoutMsg = ''
+  let connectTimer: ReturnType<typeof setTimeout> | null = null
   let connectionString = useParticipantUrl()
   let visualizerIsActive: boolean = true
   let showAnnotation = false
@@ -55,10 +57,14 @@
       case 'connected':
         Swal.fire({ position: 'top-end', icon: 'success', title: '连接建立成功', showConfirmButton: false, timer: 1500 })
         connecting = false
+        connectTimeoutMsg = ''
+        if (connectTimer) { clearTimeout(connectTimer); connectTimer = null }
         break
       case 'failed':
         Swal.fire({ position: 'top-end', icon: 'error', title: '连接失败', showConfirmButton: false, timer: 1500 })
         connecting = false
+        connectTimeoutMsg = ''
+        if (connectTimer) { clearTimeout(connectTimer); connectTimer = null }
         break
       case 'closed':
         Swal.fire({ position: 'center', icon: 'info', title: '共享已结束', text: '对方已结束共享', confirmButtonText: '返回', allowOutsideClick: false }).then(() => { reset() })
@@ -150,6 +156,16 @@
     const roomId = shortCode.trim().toUpperCase()
     console.log('[Join] 发送加入请求:', roomId)
     connecting = true
+    connectTimeoutMsg = ''
+    if (connectTimer) clearTimeout(connectTimer)
+    connectTimer = setTimeout(() => {
+      connectTimeoutMsg = '网络连接缓慢，正在尝试备用中继...'
+    }, 30000)
+    setTimeout(() => {
+      if (connecting && !isConnected) {
+        connectTimeoutMsg = '连接失败，可能原因：防火墙阻止、网络隔离。建议切换到同一 WiFi 或使用手机热点。'
+      }
+    }, 60000)
     sendSignal({ type: 'join', roomId })
   }
 
@@ -192,7 +208,12 @@
             {#if $signalingState === 'connecting'}
               <p class="has-text-grey"><i class="fas fa-spinner fa-pulse"></i> 正在连接信令服务...</p>
             {:else}
-              <p class="has-text-danger">信令服务连接失败，请重启应用</p>
+              <p class="has-text-danger mb-2">无法连接信令服务</p>
+              <p class="is-size-7 has-text-grey mb-3">请检查防火墙是否允许 Node.js 访问网络（端口 3456）</p>
+              <button class="button is-small is-warning" on:click={() => { signalingState.set('connecting'); setTimeout(() => { initSignaling() }, 500) }}>
+                <span class="icon"><i class="fas fa-redo"></i></span>
+                <span>重试</span>
+              </button>
             {/if}
           </div>
         {:else}
@@ -226,6 +247,9 @@
       <div class="connecting-screen has-text-centered">
         <p class="is-size-4">等待远程屏幕...</p>
         <progress class="progress is-small is-link mt-4" max="100" style="width: 300px; margin: 20px auto;"></progress>
+        {#if connectTimeoutMsg}
+          <p class="is-size-7 has-text-warning mt-3">{connectTimeoutMsg}</p>
+        {/if}
       </div>
     {/if}
   </div>
