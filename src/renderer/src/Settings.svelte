@@ -9,7 +9,7 @@
   let colorValue: string = '#ffffff'
   let serverUrlValue = 'http://localhost:3456'
   let isServerUrlValid = true
-  let iceServersValue: string = '{ "urls": "stun:stun.l.google.com:19302" }\n{ "urls": "stun:stun1.l.google.com:19302" }'
+  let iceServersValue: string = '{ "urls": "stun:stun.l.google.com:19302" }\n{ "urls": "stun:stun1.l.google.com:19302" }\n{ "urls": "turn:openrelay.metered.ca:80", "username": "openrelayproject", "credential": "openrelayproject" }'
   let isUsernameValid = false
   let isColorValid = false
   let isIceServersValid = true
@@ -145,21 +145,6 @@
       </div>
     </div>
     <div class="field">
-      <label class="label" for="serverUrl">信令服务器地址</label>
-      <div class="control has-icons-left has-icons-right">
-        <input
-          bind:value={serverUrlValue}
-          class="input {isServerUrlValid ? 'is-success' : 'is-danger'}"
-          type="text"
-          id="serverUrl"
-          placeholder="http://localhost:3456"
-        />
-        <span class="icon is-small is-left"><i class="fas fa-server"></i></span>
-      </div>
-      <p class="help">屏幕共享信令服务器地址，默认 localhost:3456</p>
-    </div>
-
-    <div class="field">
       <label class="label">皮肤主题</label>
       <div class="control">
         <div class="select">
@@ -186,20 +171,6 @@
           />
           {L.is_microphone_active_on_connect()}
         </label>
-      </div>
-    </div>
-
-    <h2>{L.advanced()}</h2>
-
-    <div class="field">
-      <label class="label" for="ice_servers">{L.stun_turn_server_objects()}</label>
-      <div class="control has-icons-left has-icons-right">
-        <textarea
-          bind:value={iceServersValue}
-          class="textarea {isIceServersValid ? 'is-success' : 'is-danger'}"
-          id="ice_servers"
-          placeholder="&#123; &quot;urls&quot;: &quot;stun:stun.l.google.com:19302&quot; &#125;&#10;&#123; &quot;urls&quot;: &quot;turn:your-turn-server:3478&quot;, &quot;username&quot;: &quot;user&quot;, &quot;credential&quot;: &quot;pass&quot; &#125;"
-        ></textarea>
       </div>
     </div>
 

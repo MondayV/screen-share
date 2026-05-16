@@ -38,6 +38,7 @@ declare global {
       }>
       getAppVersion: () => Promise<string>
       getLocalIPs: () => Promise<string[]>
+      getSignalingAddress: () => Promise<string>
     }
   }
 }

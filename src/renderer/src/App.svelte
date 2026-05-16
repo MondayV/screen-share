@@ -77,6 +77,15 @@
     if (evt.data?.type === 'signalServerReady') {
       const port = evt.data.port || 3456
       initSignaling(`ws://localhost:${port}`)
+      // Show firewall hint once after first connection
+      const seenFirewallHint = typeof localStorage !== 'undefined' && localStorage.getItem('pc-connect-firewall-hint')
+      if (!seenFirewallHint) {
+        setTimeout(() => {
+          const signalingUrl = `ws://${window.location.hostname}:${port}`
+          console.log('[App] 信令服务器已就绪:', signalingUrl)
+          try { localStorage.setItem('pc-connect-firewall-hint', '1') } catch {}
+        }, 2000)
+      }
     }
   })
 
@@ -84,6 +93,20 @@
     // Apply saved theme
     const savedTheme = (typeof localStorage !== 'undefined' && localStorage.getItem('pc-connect-theme')) || 'dark'
     applyTheme(savedTheme as any)
+
+    // First-run permission guide
+    const isFirstRun = typeof localStorage !== 'undefined' && !localStorage.getItem('pc-connect-first-run')
+    if (isFirstRun) {
+      const { default: Swal } = await import('sweetalert2')
+      Swal.fire({
+        title: '欢迎使用 PC Connect',
+        html: '本应用需要<strong>访问屏幕</strong>和<strong>网络连接</strong>权限。<br>请点击"允许"以继续。',
+        icon: 'info',
+        confirmButtonText: '知道了',
+        allowOutsideClick: false
+      })
+      try { localStorage.setItem('pc-connect-first-run', '1') } catch {}
+    }
 
     // Also try direct connection as fallback (server may already be ready)
     try {

@@ -3,6 +3,7 @@ import { app, BrowserWindow, ipcMain, screen } from 'electron'
 import { createCursorsWindow } from './cursors'
 import { createFloatingWindow, closeFloatingWindow, isFloatingWindowOpen } from './floatingWindow'
 import { settingsKeeper } from './stateKeeper'
+import { getLocalIP } from './local-ip'
 import os from 'os'
 
 let robot: any = null
@@ -73,6 +74,10 @@ export const ipcMainHandlersInit = (): void => {
       }
     }
     return ips
+  })
+
+  ipcMain.handle('get-signaling-address', async (): Promise<string> => {
+    return `ws://${getLocalIP()}:3456`
   })
 
   // Floating window

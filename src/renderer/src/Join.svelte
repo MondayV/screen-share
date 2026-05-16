@@ -107,8 +107,32 @@
 
     onSignalMessage('error', (data) => {
       console.error('[Join] 信令错误:', data.message, '完整数据:', JSON.stringify(data))
-      Swal.fire({ position: 'center', icon: 'error', title: '连接失败', text: data.message || '请确认连接码正确', confirmButtonText: '确定' })
-      connecting = false
+      const msg = data.message || ''
+      let title = '连接失败'
+      let text = msg
+      if (msg.includes('无效') || msg.includes('过期')) {
+        title = '短码无效'
+        text = '该连接码不存在或已过期，请确认后重试'
+      } else if (msg.includes('离线')) {
+        title = '主持人已离线'
+        text = '对方已断开连接'
+      } else {
+        text = msg || '网络不可达，请检查网络连接后重试'
+      }
+      Swal.fire({
+        position: 'center', icon: 'error', title, text,
+        confirmButtonText: '重试',
+        showCancelButton: true,
+        cancelButtonText: '返回'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          // Retry: re-send join
+          connecting = true
+          sendSignal({ type: 'join', roomId: shortCode.trim().toUpperCase() })
+        } else {
+          connecting = false
+        }
+      })
     })
 
     webRTCComponent.onReconnectNeeded = () => {
