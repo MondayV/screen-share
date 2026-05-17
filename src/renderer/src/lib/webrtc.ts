@@ -65,13 +65,26 @@ export class WebRTCManager {
     }
 
     try {
-      if (sourceId) {
+      let effectiveSourceId = sourceId
+
+      if (!effectiveSourceId) {
+        try {
+          const sources = await window.PcConnectApi.getSources()
+          if (sources.length > 0) {
+            effectiveSourceId = sources[0].id
+          }
+        } catch {
+          // getSources() failed, will fall back to getDisplayMedia
+        }
+      }
+
+      if (effectiveSourceId) {
         const constraints = {
           audio: false,
           video: {
             mandatory: {
               chromeMediaSource: 'desktop',
-              chromeMediaSourceId: sourceId
+              chromeMediaSourceId: effectiveSourceId
             }
           }
         }
