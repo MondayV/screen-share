@@ -35,6 +35,7 @@ export async function createCursorsWindow(): Promise<BrowserWindow> {
       x: 0,
       y: 0
     })
+    cursorsWindow.setIgnoreMouseEvents(true, { forward: true })
     cursorsWindow.showInactive()
   })
 

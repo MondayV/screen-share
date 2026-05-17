@@ -19,6 +19,21 @@
   let stream: MediaStream | null = null
   let audioElement: HTMLAudioElement | null = null
   let userSettings: SettingsData | null = null
+  let onIceCandidateCb: ((candidate: RTCIceCandidateInit) => void) | null = null
+
+  export function SetIceCandidateHandler(cb: (candidate: RTCIceCandidateInit) => void): void {
+    onIceCandidateCb = cb
+  }
+
+  export async function AddIceCandidate(candidate: RTCIceCandidateInit): Promise<void> {
+    if (pc) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate))
+      } catch (e) {
+        console.error('Failed to add ICE candidate:', e)
+      }
+    }
+  }
 
   const remoteMouseCursorPositionsChannelIsReady = (): boolean => {
     if (!remoteMouseCursorPositionsChannel) return false
@@ -105,11 +120,8 @@
       }
     }
     pc.onicecandidate = function (e: RTCPeerConnectionIceEvent): void {
-      const cand = e.candidate
-      if (!cand) {
-        console.log('ICE 候选人收集: 完成')
-      } else {
-        console.log('新的 ICE 候选人')
+      if (e.candidate && onIceCandidateCb) {
+        onIceCandidateCb(e.candidate)
       }
     }
     pc.oniceconnectionstatechange = function (): void {
@@ -231,5 +243,32 @@
     } catch (e) {
       errorHander(e)
     }
+  }
+
+  // ---- Signaling-based connection (room codes) ----
+
+  export async function CreateHostOffer(): Promise<RTCSessionDescriptionInit> {
+    remoteMouseCursorPositionsChannel = pc.createDataChannel('remoteMouseCursorPositions')
+    remoteCursorPingChannel = pc.createDataChannel('remoteCursorPing')
+    setupDataChannel(remoteMouseCursorPositionsChannel)
+    setupDataChannel(remoteCursorPingChannel)
+    const offer = await pc.createOffer()
+    await pc.setLocalDescription(offer)
+    return pc.localDescription
+  }
+
+  export async function SetRemoteAnswer(answer: RTCSessionDescriptionInit): Promise<void> {
+    const desc = new RTCSessionDescription(answer)
+    await pc.setRemoteDescription(desc)
+  }
+
+  export async function HandleHostOffer(
+    offer: RTCSessionDescriptionInit
+  ): Promise<RTCSessionDescriptionInit> {
+    const desc = new RTCSessionDescription(offer)
+    await pc.setRemoteDescription(desc)
+    const answer = await pc.createAnswer()
+    await pc.setLocalDescription(answer)
+    return pc.localDescription
   }
 </script>

@@ -96,6 +96,7 @@ export const getDataFromPcConnectUrl = async (
 }
 
 export const makeVideoDraggable = (video: HTMLVideoElement): void => {
+  if (!video) return
   let startX: number
   let startY: number
   let initialX: number
