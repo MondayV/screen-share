@@ -34,6 +34,8 @@ declare global {
         iceServers: IceServer[]
       }>
       getAppVersion: () => Promise<string>
+      getSources: () => Promise<{ id: string; name: string; thumbnail: string }[]>
+      simulateInput: (data: { type: string; x: number; y: number }) => Promise<void>
     }
   }
 }

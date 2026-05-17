@@ -51,6 +51,9 @@ const PcConnectApi = {
   }): Promise<void> => {
     ipcRenderer.invoke('updateSettings', settings)
   },
+  getSources: async (): Promise<{ id: string; name: string; thumbnail: string }[]> => {
+    return await ipcRenderer.invoke('getSources')
+  },
   toggleRemoteCursors: async (state: boolean): Promise<void> => {
     ipcRenderer.invoke('toggleRemoteCursors', state)
   },
@@ -65,6 +68,9 @@ const PcConnectApi = {
     y: number
   }): Promise<void> => {
     ipcRenderer.invoke('updateRemoteCursor', state)
+  },
+  simulateInput: async (data: { type: string; x: number; y: number }): Promise<void> => {
+    ipcRenderer.invoke('simulateInput', data)
   }
 }
 

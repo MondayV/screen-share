@@ -40,9 +40,9 @@ export const settingsKeeper = async (): Promise<Settings> => {
     language: 'zh',
     isMicrophoneEnabledOnConnect: true,
     iceServers: [
-      {
-        urls: 'stun:stun.l.google.com:19302'
-      }
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'turn:relay1.expressturn.com:3478', username: 'efree', credential: 'efree' },
+      { urls: 'turn:relay2.expressturn.com:3478?transport=tcp', username: 'efree', credential: 'efree' }
     ]
   }
 
