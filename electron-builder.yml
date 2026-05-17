@@ -1,35 +1,20 @@
-appId: net.getpcconnect
-productName: PC Connect
+appId: com.screen-share.app
+productName: PCConnect
 directories:
-  buildResources: build
+  buildResources: resources
   output: release
-files:
-  - '!**/.vscode/*'
-  - '!src/*'
-  - '!electron.vite.config.*'
-  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml}'
-  - '!{.typesafe-i18n.json,svelte.config.mjs,tsconfig.json,tsconfig.node.json}'
-  - '!{.claude,screenshots,.github}'
-  - '!dev-app-update.yml'
 win:
-  executableName: PCConnect
-  icon: build/icon.ico
-  target:
-    - nsis
+  target: nsis
+  icon: resources/icon.ico
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
-  shortcutName: PC Connect
-  uninstallDisplayName: PC Connect
-  createDesktopShortcut: always
-mac:
-  entitlementsInherit: build/entitlements.mac.plist
-  icon: build/icon.icns
-  target:
-    - dmg
-linux:
-  icon: build/icon.png
-  target:
-    - AppImage
-    - deb
-  maintainer: PC Connect
-  category: Utility
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
+  installerHeaderIcon: resources/icon.ico
+# 以下关键配置：
+extraResources: []
+files:
+  - "out/**/*"
+  - "package.json"
+asar: false  # 暂时关闭 asar，方便调试

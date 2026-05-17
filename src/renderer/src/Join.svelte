@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, onDestroy } from 'svelte'
   import Swal from 'sweetalert2'
   import { L } from './translations'
   import { makeVideoDraggable, getUUIDv4 } from './Utils'
   import { useNavigationEnabled, useIsWatching } from './stores'
   import WebRTC from './WebRTC.svelte'
   import AudioVisualizer from './AudioVisualizer.svelte'
-  import { connectToRoom, sendTo, on, closeSignaling } from './lib/signaling'
+  import { connectToRoom, sendTo, on, off, closeSignaling } from './lib/signaling'
 
   const navigationEnabled = useNavigationEnabled()
   const isWatching = useIsWatching()
@@ -22,7 +22,14 @@
   let roomCode = ''
   let joinAttempting = false
   let visualizerIsActive = true
+  let settings: any = {}
 
+  // ---- event listener cleanups ----
+  let screenListenersSetup = false
+  const screenCleanupFns: Array<() => void> = []
+  const signalingCleanupFns: Array<{ event: string; cb: (msg: any) => void }> = []
+
+  // ---- reactive: connection state → UI ----
   const onConnectionStateChange = (): void => {
     switch (connectionState) {
       case 'connected':
@@ -40,8 +47,97 @@
 
   $: connectionState, onConnectionStateChange()
 
+  // ---- reactive: set up remoteScreen listeners once the video element exists ----
+  $: if (remoteScreen && !screenListenersSetup) {
+    setupScreenListeners()
+  }
+
+  function setupScreenListeners(): void {
+    if (screenListenersSetup) return
+    screenListenersSetup = true
+
+    makeVideoDraggable(remoteScreen)
+
+    const onDblClick = (): void => {
+      webRTCComponent?.pingRemoteCursor('cursor-' + UUID)
+    }
+    remoteScreen.addEventListener('dblclick', onDblClick)
+    screenCleanupFns.push(() => { if (remoteScreen) remoteScreen.removeEventListener('dblclick', onDblClick) })
+
+    let mouseDown = false
+
+    const onMouseDown = (e: MouseEvent): void => {
+      mouseDown = true
+      const { offsetX, offsetY } = e
+      webRTCComponent?.sendRemoteClick({
+        type: 'mousedown',
+        x: offsetX / remoteScreen.clientWidth,
+        y: offsetY / remoteScreen.clientHeight
+      })
+    }
+    remoteScreen.addEventListener('mousedown', onMouseDown)
+    screenCleanupFns.push(() => { if (remoteScreen) remoteScreen.removeEventListener('mousedown', onMouseDown) })
+
+    const onMouseUp = (e: MouseEvent): void => {
+      mouseDown = false
+      const { offsetX, offsetY } = e
+      webRTCComponent?.sendRemoteClick({
+        type: 'mouseup',
+        x: offsetX / remoteScreen.clientWidth,
+        y: offsetY / remoteScreen.clientHeight
+      })
+    }
+    remoteScreen.addEventListener('mouseup', onMouseUp)
+    screenCleanupFns.push(() => { if (remoteScreen) remoteScreen.removeEventListener('mouseup', onMouseUp) })
+
+    const onClick = (e: MouseEvent): void => {
+      const { offsetX, offsetY } = e
+      webRTCComponent?.sendRemoteClick({
+        type: 'click',
+        x: offsetX / remoteScreen.clientWidth,
+        y: offsetY / remoteScreen.clientHeight
+      })
+    }
+    remoteScreen.addEventListener('click', onClick)
+    screenCleanupFns.push(() => { if (remoteScreen) remoteScreen.removeEventListener('click', onClick) })
+
+    const onContextMenu = (e: MouseEvent): void => {
+      e.preventDefault()
+      const { offsetX, offsetY } = e
+      webRTCComponent?.sendRemoteClick({
+        type: 'contextmenu',
+        x: offsetX / remoteScreen.clientWidth,
+        y: offsetY / remoteScreen.clientHeight
+      })
+    }
+    remoteScreen.addEventListener('contextmenu', onContextMenu)
+    screenCleanupFns.push(() => { if (remoteScreen) remoteScreen.removeEventListener('contextmenu', onContextMenu) })
+
+    const onMouseMove = (e: MouseEvent): void => {
+      const { offsetX, offsetY } = e
+      webRTCComponent?.updateRemoteCursor({
+        x: offsetX / remoteScreen.clientWidth,
+        y: offsetY / remoteScreen.clientHeight,
+        name: settings.username ?? '',
+        id: 'cursor-' + UUID,
+        color: settings.color ?? '#000000'
+      })
+    }
+    remoteScreen.addEventListener('mousemove', onMouseMove)
+    screenCleanupFns.push(() => { if (remoteScreen) remoteScreen.removeEventListener('mousemove', onMouseMove) })
+  }
+
+  function teardownScreenListeners(): void {
+    screenCleanupFns.forEach((fn) => {
+      try { fn() } catch {}
+    })
+    screenCleanupFns.length = 0
+    screenListenersSetup = false
+  }
+
+  // ---- join room logic (1:1 only) ----
   const onJoinClick = async (): Promise<void> => {
-    if (!roomCode || roomCode.length !== 6) return
+    if (!roomCode || roomCode.length !== 6 || joinAttempting || isConnected) return
     joinAttempting = true
     try {
       await webRTCComponent.init()
@@ -51,7 +147,8 @@
         sendTo(peerId, { type: 'ice-candidate', candidate } as any)
       })
 
-      on('offer', async (msg) => {
+      const onOffer = async (msg: any): Promise<void> => {
+        if (isConnected) return
         try {
           const answer = await webRTCComponent.handleOffer(msg.from, msg.offer)
           sendTo(msg.from, { type: 'answer', answer } as any)
@@ -60,85 +157,49 @@
           $navigationEnabled = false
         } catch (e) {
           console.error('Failed to handle offer:', e)
+          Swal.fire({ position: 'top-end', icon: 'error', title: '连接失败，请重试', showConfirmButton: false, timer: 2000 })
         }
-      })
+      }
+      on('offer', onOffer)
+      signalingCleanupFns.push({ event: 'offer', cb: onOffer })
 
-      on('ice-candidate', (msg) => {
+      const onIceMsg = (msg: any): void => {
+        if (!msg.candidate) return
         webRTCComponent.addIceCandidate(msg.from, msg.candidate)
-      })
+      }
+      on('ice-candidate', onIceMsg)
+      signalingCleanupFns.push({ event: 'ice-candidate', cb: onIceMsg })
 
-      on('peer-left', () => {
+      const onPeerLeft = (): void => {
         reset()
-      })
+      }
+      on('peer-left', onPeerLeft)
+      signalingCleanupFns.push({ event: 'peer-left', cb: onPeerLeft })
 
-      on('close', () => {
+      const onClose = (): void => {
         reset()
-      })
+      }
+      on('close', onClose)
+      signalingCleanupFns.push({ event: 'close', cb: onClose })
 
       await connectToRoom(roomCode)
     } catch (e) {
       console.error('Join failed:', e)
-      Swal.fire({ position: 'top-end', icon: 'error', title: '加入房间失败', showConfirmButton: false, timer: 1500 })
+      Swal.fire({ position: 'top-end', icon: 'error', title: '加入房间失败', showConfirmButton: false, timer: 2000 })
     } finally {
       joinAttempting = false
     }
   }
 
   onMount(async () => {
-    const settings = await window.PcConnectApi.getSettings()
+    settings = await window.PcConnectApi.getSettings()
     microphoneActive = settings.isMicrophoneEnabledOnConnect
-    makeVideoDraggable(remoteScreen)
+  })
 
-    remoteScreen.addEventListener('dblclick', () => {
-      webRTCComponent.pingRemoteCursor('cursor-' + UUID)
-    })
-
-    let mouseDown = false
-    remoteScreen.addEventListener('mousedown', (e) => {
-      mouseDown = true
-      const { offsetX, offsetY } = e
-      webRTCComponent.sendRemoteClick({
-        type: 'mousedown',
-        x: offsetX / remoteScreen.clientWidth,
-        y: offsetY / remoteScreen.clientHeight
-      })
-    })
-    remoteScreen.addEventListener('mouseup', (e) => {
-      mouseDown = false
-      const { offsetX, offsetY } = e
-      webRTCComponent.sendRemoteClick({
-        type: 'mouseup',
-        x: offsetX / remoteScreen.clientWidth,
-        y: offsetY / remoteScreen.clientHeight
-      })
-    })
-    remoteScreen.addEventListener('click', (e) => {
-      const { offsetX, offsetY } = e
-      webRTCComponent.sendRemoteClick({
-        type: 'click',
-        x: offsetX / remoteScreen.clientWidth,
-        y: offsetY / remoteScreen.clientHeight
-      })
-    })
-    remoteScreen.addEventListener('contextmenu', (e) => {
-      e.preventDefault()
-      const { offsetX, offsetY } = e
-      webRTCComponent.sendRemoteClick({
-        type: 'contextmenu',
-        x: offsetX / remoteScreen.clientWidth,
-        y: offsetY / remoteScreen.clientHeight
-      })
-    })
-    remoteScreen.addEventListener('mousemove', (e) => {
-      const { offsetX, offsetY } = e
-      webRTCComponent.updateRemoteCursor({
-        x: offsetX / remoteScreen.clientWidth,
-        y: offsetY / remoteScreen.clientHeight,
-        name: settings.username,
-        id: 'cursor-' + UUID,
-        color: settings.color
-      })
-    })
+  onDestroy(() => {
+    teardownScreenListeners()
+    signalingCleanupFns.forEach(({ event, cb }) => off(event, cb))
+    signalingCleanupFns.length = 0
   })
 
   const reset = (): void => {
@@ -148,6 +209,9 @@
     isConnected = false
     $navigationEnabled = true
     $isWatching = false
+    teardownScreenListeners()
+    signalingCleanupFns.forEach(({ event, cb }) => off(event, cb))
+    signalingCleanupFns.length = 0
   }
 
   const onDisconnectClick = async (): Promise<void> => {
@@ -156,13 +220,16 @@
     reset()
   }
 
-  const onFullscreenClick = (): void => remoteScreen.requestFullscreen()
+  const onFullscreenClick = (): void => {
+    if (remoteScreen) remoteScreen.requestFullscreen()
+  }
   const onZoomInClick = (): void => {
+    if (!remoteScreen) return
     zoomFactor += 0.1
     remoteScreen.style.scale = zoomFactor.toString()
   }
   const onZoomOutClick = (): void => {
-    if (zoomFactor <= 1) return
+    if (!remoteScreen || zoomFactor <= 1) return
     zoomFactor -= 0.1
     remoteScreen.style.scale = zoomFactor.toString()
   }

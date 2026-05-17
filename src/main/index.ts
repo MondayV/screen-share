@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, session, desktopCapturer } from 'electron'
 import path from 'path'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
 import { windowStateKeeper } from './stateKeeper'
 import { ipcMainHandlersInit } from './ipcMainHandlers'
@@ -72,7 +73,13 @@ async function createWindow(): Promise<void> {
 
   session.defaultSession.setDisplayMediaRequestHandler((_, callback) => {
     desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
-      callback({ video: sources[0] })
+      if (sources.length > 0) {
+        callback({ video: sources[0] })
+      } else {
+        callback({ video: undefined })
+      }
+    }).catch(() => {
+      callback({ video: undefined })
     })
   })
 
@@ -114,6 +121,25 @@ app.whenReady().then(async () => {
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+
+  autoUpdater.setFeedURL({
+    provider: 'github',
+    owner: 'MondayV',
+    repo: 'screen-share'
+  })
+  autoUpdater.checkForUpdatesAndNotify()
+})
+
+autoUpdater.on('update-available', () => {
+  if (MAIN_WINDOW) {
+    MAIN_WINDOW.webContents.send('update-available')
+  }
+})
+
+autoUpdater.on('update-downloaded', () => {
+  if (MAIN_WINDOW) {
+    MAIN_WINDOW.webContents.send('update-downloaded')
+  }
 })
 
 app.on('window-all-closed', () => {

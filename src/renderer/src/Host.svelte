@@ -1,11 +1,12 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte'
   import Swal from 'sweetalert2'
   import { L } from './translations'
   import { useNavigationEnabled, useIsHosting } from './stores'
   import WebRTC from './WebRTC.svelte'
   import AudioVisualizer from './AudioVisualizer.svelte'
   import SourcePicker from './SourcePicker.svelte'
-  import { connectToRoom, sendTo, on, closeSignaling, generateRoomCode } from './lib/signaling'
+  import { connectToRoom, sendTo, on, off, closeSignaling, generateRoomCode } from './lib/signaling'
 
   const navigationEnabled = useNavigationEnabled()
   const isHosting = useIsHosting()
@@ -23,6 +24,8 @@
   let connectedPeers: string[] = []
   let showSourcePicker = false
   let sources: { id: string; name: string; thumbnail: string }[] = []
+  let signalingSetup = false
+  const signalingCleanupFns: Array<{ event: string; cb: (msg: any) => void }> = []
 
   const onConnectionStateChange = (): void => {
     switch (connectionState) {
@@ -47,33 +50,59 @@
   }
 
   const setupSignaling = (): void => {
+    if (signalingSetup) return
+    signalingSetup = true
+
     webRTCComponent.setIceCandidateCallback((peerId, candidate) => {
       sendTo(peerId, { type: 'ice-candidate', candidate } as any)
     })
 
-    on('participant-joined', async (msg) => {
+    const onParticipantJoined = async (msg: any): Promise<void> => {
+      if (!msg.peerId) return
       try {
         const offer = await webRTCComponent.createConnectionForParticipant(msg.peerId)
         sendTo(msg.peerId, { type: 'offer', offer } as any)
         connectedPeers = [...connectedPeers, msg.peerId]
       } catch (e) {
         console.error('Failed to create offer:', e)
+        Swal.fire({ position: 'top-end', icon: 'error', title: '创建连接失败', showConfirmButton: false, timer: 1500 })
       }
-    })
+    }
+    on('participant-joined', onParticipantJoined)
+    signalingCleanupFns.push({ event: 'participant-joined', cb: onParticipantJoined })
 
-    on('answer', (msg) => {
+    const onAnswer = (msg: any): void => {
+      if (!msg.from || !msg.answer) return
       webRTCComponent.setRemoteAnswer(msg.from, msg.answer)
-    })
+    }
+    on('answer', onAnswer)
+    signalingCleanupFns.push({ event: 'answer', cb: onAnswer })
 
-    on('ice-candidate', (msg) => {
+    const onIceMsg = (msg: any): void => {
+      if (!msg.from || !msg.candidate) return
       webRTCComponent.addIceCandidate(msg.from, msg.candidate)
-    })
+    }
+    on('ice-candidate', onIceMsg)
+    signalingCleanupFns.push({ event: 'ice-candidate', cb: onIceMsg })
 
-    on('peer-left', (msg) => {
+    const onPeerLeft = (msg: any): void => {
+      if (!msg.peerId) return
       webRTCComponent.removeConnection(msg.peerId)
-      connectedPeers = connectedPeers.filter(p => p !== msg.peerId)
-    })
+      connectedPeers = connectedPeers.filter((p) => p !== msg.peerId)
+    }
+    on('peer-left', onPeerLeft)
+    signalingCleanupFns.push({ event: 'peer-left', cb: onPeerLeft })
   }
+
+  const teardownSignaling = (): void => {
+    signalingCleanupFns.forEach(({ event, cb }) => off(event, cb))
+    signalingCleanupFns.length = 0
+    signalingSetup = false
+  }
+
+  onDestroy(() => {
+    teardownSignaling()
+  })
 
   const startSharingSession = async (sourceId?: string): Promise<void> => {
     try {
@@ -92,7 +121,8 @@
       $isHosting = true
     } catch (e) {
       console.error('Start sharing failed:', e)
-      Swal.fire({ position: 'top-end', icon: 'error', title: '启动共享失败', showConfirmButton: false, timer: 1500 })
+      const msg = (e as Error).message || '启动共享失败'
+      Swal.fire({ position: 'top-end', icon: 'error', title: msg, showConfirmButton: false, timer: 3000 })
     }
   }
 
@@ -144,6 +174,7 @@
   const onDisconnectClick = async (): Promise<void> => {
     await webRTCComponent.disconnect()
     closeSignaling()
+    teardownSignaling()
     reset()
   }
 
