@@ -65,6 +65,12 @@ const PcConnectApi = {
     y: number
   }): Promise<void> => {
     ipcRenderer.invoke('updateRemoteCursor', state)
+  },
+  startStreaming: async (): Promise<{ publicUrl: string; streamKey: string }> => {
+    return await ipcRenderer.invoke('startStreaming')
+  },
+  stopStreaming: async (): Promise<void> => {
+    ipcRenderer.invoke('stopStreaming')
   }
 }
 

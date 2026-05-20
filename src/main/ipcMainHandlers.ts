@@ -55,4 +55,15 @@ export const ipcMainHandlersInit = (): void => {
   ipcMain.handle('getAppVersion', (): string => {
     return app.getVersion()
   })
+  ipcMain.handle('startStreaming', async (): Promise<{ publicUrl: string; streamKey: string }> => {
+    const { startMediaMTX, startCloudflared } = require('./streaming')
+    await startMediaMTX()
+    const publicUrl = await startCloudflared()
+    const streamKey = Math.random().toString(36).slice(2, 8).toUpperCase()
+    return { publicUrl, streamKey }
+  })
+  ipcMain.handle('stopStreaming', async (): Promise<void> => {
+    const { stopAll } = require('./streaming')
+    stopAll()
+  })
 }
