@@ -1,193 +1,158 @@
-# 指令：重构为 OBS 串流模式 + 全面清理残留文件
+# 指令：PCConnect v2.0.0 正式发布 (OBS串流模式) — 全自动整理与部署
 
 ## 目标
-1. 将屏幕共享架构从 **WebRTC + 信令服务器** 彻底改为 **OBS 推流 + restream.io 中继 + 应用内 HLS 播放**。
-2. **删除所有与 ngrok、cloudflared、临时隧道相关的文件、脚本、配置**。
-3. 保留 Electron 外壳、安装更新流程、UI 皮肤系统，仅替换核心共享逻辑。
-4. 最终生成 v2.0.0 安装包，让朋友打开应用即可观看，无需任何网络配置。
+1. 更换项目图标，移除所有与借鉴项目（腾讯会议等）相关的图片，使用默认/通用图标。
+2. 清理项目多余文件，确保代码整洁。
+3. 更新 `README.md`，包含软件基本用法、OBS 配置教程、更新日志。
+4. 将当前分支 `dev/v1.0.1` 设为 `main` 主分支，并强制推送到远程。
+5. 升级版本号至 `2.0.0`，提交代码，打标签 `v2.0.0`，创建 GitHub Release。
 
-## 前置条件
-- 用户已注册 [restream.io](https://restream.io) 免费账号（每月 10 事件，每事件 2 小时，足够日常使用）。
-- 已获取 restream.io 的 **API Key**（在 Settings → API 页面生成）。
-- Cloudflare Worker `screen-share-signal` 已部署，用于存储房间码与流地址映射。
-- 本地 OBS Studio 已安装（主持人端需手动推流）。
+## 执行步骤（AI 严格按顺序完成）
 
-## 执行步骤
+### 1. 更换应用图标，移除侵权素材
+- 检查 `electron-builder.yml` 或 `package.json` 中 `build.win.icon` 配置，如果指向具体图标文件（如 `resources/icon.ico`），执行以下操作：
+  - 使用 **Node.js 脚本** 生成一个极简的 256x256 像素 **绿色 PC 连接图标** (ICO 格式)。
+    ```js
+    // AI 可运行此脚本生成图标
+    const fs = require('fs');
+    const { createCanvas } = require('canvas');
+    const canvas = createCanvas(256, 256);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#00FF88';
+    ctx.fillRect(0, 0, 256, 256);
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 140px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('PC', 128, 128);
+    const buf = canvas.toBuffer();
+    fs.writeFileSync('resources/icon.png', buf);
+    // 然后使用 png-to-ico 转换
+若 canvas 模块不可用，可改用 Electron 默认图标：直接移除 icon 配置项，打包时将使用 Electron 自带的默认图标，完全无版权风险。
 
-### 第一步：全面清理残留文件（ngrok / cloudflared / 旧信令）
-1. **删除 ngrok 相关文件**：
-   - 删除 `C:\ngrok-v3` 整个目录（如果存在）。
-   - 删除 `C:\Users\MONv\scoop\apps\ngrok` 目录（如果通过 Scoop 安装）。
-   - 删除项目根目录下可能残留的 `ngrok.exe`、`ngrok.yml`。
-2. **删除 cloudflared 相关文件**：
-   - 删除 `C:\Users\MONv\scoop\apps\cloudflared` 目录（如果存在）。
-   - 删除项目内任何 `cloudflared` 可执行文件或配置文件。
-3. **删除旧的测试脚本和临时文件**：
-   - 删除 `test-two.bat`、`test-two.sh`（之后可重建专用测试脚本）。
-   - 删除 `test-simple.ps1`、`build-portable.ps1` 等临时脚本。
-   - 删除 `release/` 下所有旧的绿版文件夹和安装包（保留 `release/` 目录本身）。
-4. **删除旧的本地信令服务器残留**：
-   - 确认 `src/main/signaling-server.js` 或任何 `server.js` 已移除。
-   - 从 `package.json` 的 `dependencies` 中移除 `ws`、`@p2pcf/worker`、`@p2pcf/client`（如果存在）。
-   - 执行 `npm uninstall ws @p2pcf/worker @p2pcf/client`。
-5. **清理泄露的 token 痕迹**（安全）：
-   - 检查 `src/` 下是否有硬编码的 `3Dz0CN8g...`（ngrok authtoken），若有则删除并替换为环境变量或用户输入。
-   - 提醒用户：**立即登录 ngrok 控制台撤销旧 token，并生成新 token（已建议过，但必须再次强调）**。
+删除其他可能存在的借鉴图片（如 resources/tencent-icon.ico、assets/qq-meeting.png 等），AI 需搜索 resources、assets 目录，凡是包含 tencent、qq、会议、meeting 等关键字的资源文件，一律删除或替换为通用图标。
 
-### 第二步：移除所有 WebRTC 和信令交换代码
-1. **删除核心 WebRTC 模块**：
-   - 删除 `src/renderer/src/lib/webrtc.ts`（整个文件）。
-   - 删除 `src/renderer/src/lib/signaling.ts`（旧的 WebSocket 信令文件）。
-2. **清理 Svelte 组件中的 WebRTC 调用**：
-   - 在 `Host.svelte`、`Join.svelte`、`WebRTC.svelte` 中移除所有 `RTCPeerConnection`、`createOffer`、`addIceCandidate` 等代码。
-   - 移除 `remoteScreen` 视频元素上的 `ontrack` 等事件处理。
-   - **保留** `src/renderer/src/Utils.ts` 中的 `makeVideoDraggable`（可能后续用于播放器拖动）。
-3. **清理主进程**：
-   - 从 `src/main/index.ts` 中移除所有与 `desktopCapturer`、`get-sources` 相关的 IPC 处理（不再需要屏幕捕获权限）。
-   - 移除 `session.setPermissionRequestHandler` 中有关 `media` 的请求。
-   - 移除 `electron-builder.yml` 中不必要的权限声明（如 `audioCapture`、`videoCapture`）。
+确认项目中没有残留的腾讯会议 UI 截图或设计稿。
 
-### 第三步：集成 restream.io API
-1. **新建 `src/renderer/src/lib/restream.ts`**：
-   ```ts
-   const RESTREAM_API = 'https://api.restream.io/v1';
+2. 清理项目多余文件
+删除所有测试脚本和临时文件：
 
-   export async function createEvent(apiKey: string): Promise<{ rtmpUrl: string; streamKey: string; hlsUrl: string; eventId: string }> {
-     const res = await fetch(`${RESTREAM_API}/events`, {
-       method: 'POST',
-       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-       body: JSON.stringify({ title: 'Screen Share', description: 'PcConnect session' })
-     });
-     if (!res.ok) throw new Error('Failed to create restream event');
-     const data = await res.json();
-     return {
-       rtmpUrl: data.rtmp_url,
-       streamKey: data.stream_key,
-       hlsUrl: data.hls_url,
-       eventId: data.id
-     };
-   }
+test-two.bat、test-two.sh、test-simple.ps1、build-portable.ps1
 
-   export async function endEvent(apiKey: string, eventId: string): Promise<void> {
-     await fetch(`${RESTREAM_API}/events/${eventId}`, {
-       method: 'DELETE',
-       headers: { 'Authorization': `Bearer ${apiKey}` }
-     });
-   }
-添加 API Key 存储：
+删除旧的开发者指令文件 .claude/commands/ 下除 release-v2.0.0.md 外的所有 .md 文件（如果存在）。
 
-在 Host.svelte 的 <script> 中增加 let apiKey = ''。
+删除 ngrok、cloudflared 等残留的可执行文件和配置文件（确认 C:\ngrok-v3 等已删除，项目目录内无 ngrok.exe、cloudflared.exe）。
 
-首次使用时弹出输入框，要求输入 restream API Key（提供获取链接）。
+确保 node_modules 未进入版本库（.gitignore 已包含）。
 
-存储在 localStorage 中，后续自动读取。
+3. 更新 README.md
+使用以下 Markdown 模板 覆盖原有内容（AI 可根据实际文件路径微调）：
 
-第四步：改造 Cloudflare Worker 支持 KV 存储
-更新 signal-worker/wrangler.toml，增加 KV 命名空间：
+markdown
+# PCConnect - 零门槛屏幕共享
 
-toml
-[[kv_namespaces]]
-binding = "ROOMS"
-id = "your-kv-id"   # AI 需提示用户手动创建 KV 命名空间并填入 ID
-修改 signal-worker/src/index.js，添加房间映射 API：
+一款基于 OBS + MediaMTX + Cloudflare 免费隧道的屏幕共享工具，**主持人无需注册、无需域名、无需 API Key**，观众只需粘贴链接即可观看。
 
-js
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-    if (url.pathname.startsWith('/api/room/')) {
-      const code = url.pathname.split('/').pop();
-      if (request.method === 'PUT') {
-        const data = await request.json();
-        await env.ROOMS.put(code, JSON.stringify(data));
-        return new Response(null, { status: 204 });
-      } else if (request.method === 'GET') {
-        const value = await env.ROOMS.get(code);
-        if (!value) return new Response('Room not found', { status: 404 });
-        return new Response(value, { headers: { 'Content-Type': 'application/json' } });
-      }
-    }
-    // 原信令逻辑可删除，或保留但不再使用
-    return new Response('PC Connect Stream', { status: 200 });
-  }
-};
-重新部署 Worker：
+## ✨ 功能特点
+- 🖥️ **屏幕共享**：利用 OBS 强大的采集能力，支持整个屏幕、窗口、游戏画面。
+- 🔊 **语音通话**：支持麦克风采集（需在 OBS 中配置音频源）。
+- 🔗 **零门槛分享**：自动生成公网播放链接，发给朋友即可观看，无需任何网络配置。
+- 💰 **永久免费**：基于开源组件，无次数限制，无月费。
+- 🎨 **皮肤系统**：内置多款皮肤（默认、深色、赛博朋克、手账涂鸦、像素比特）。
 
-在 signal-worker 目录执行 npx wrangler deploy。
+## 📥 安装
+1. 下载最新安装包：从 [GitHub Releases](https://github.com/MondayV/screen-share/releases) 下载 `PCConnect Setup 2.0.0.exe`。
+2. 双击安装，勾选“创建桌面快捷方式”。
+3. 安装完成后，桌面会出现 PCConnect 图标。
 
-第五步：重构主持人界面（Host.svelte）
-按钮行为变更：
+## 🚀 使用教程
 
-“开始共享”按钮调用 restream.createEvent(apiKey)，获得推流地址和密钥。
+### 作为主持人（共享你的屏幕）
+1. **安装 OBS Studio**：从 [obsproject.com](https://obsproject.com/) 下载并安装 OBS。
+2. **启动 PCConnect**，点击 **“开始共享”**。
+3. 应用会自动在后台启动串流服务，并显示：
+   - **OBS 服务器地址**：`rtmp://localhost:1935`
+   - **OBS 串流密钥**：`随机6位密钥`
+   - **公网播放链接**：`https://xxxx.trycloudflare.com/密钥/index.m3u8`
+4. **配置 OBS**：
+   - 打开 OBS，点击 **设置 → 推流**。
+   - 服务选择 `自定义...`，填入上述服务器和密钥。
+   - 在来源中添加要共享的内容（显示器采集 / 窗口采集 / 游戏采集）。
+5. 点击 OBS 的 **“开始推流”**。
+6. 将 **公网播放链接** 复制并发送给朋友。
+7. 结束时，在 OBS 中点击“停止推流”，并在 PCConnect 中点击“停止共享”。
 
-将事件数据（hlsUrl, rtmpUrl, streamKey）与生成的 6 位房间码存入 Worker KV（PUT /api/room/:code）。
+### 作为观众（观看朋友的屏幕）
+1. 启动 PCConnect，点击 **“观看”** 选项卡。
+2. 粘贴主持人分享的 **播放链接**，点击 **“观看”** 按钮。
+3. 稍等片刻，应用内将播放共享画面（延迟约 1-5 秒）。
 
-界面显示：
+### OBS 使用注意事项
+- 以管理员身份运行 OBS 可避免部分游戏黑屏或无法捕获的问题。
+- 如果共享游戏，推荐使用“游戏采集”模式，性能更优。
+- 网络不稳定时可降低 OBS 输出比特率（设置 → 输出 → 视频比特率，建议 2000-4000 Kbps）。
 
-房间码（超大字体，一键复制）
+## 🛠️ 高级设置（可选）
+- **自定义皮肤**：在 PCConnect 设置中可切换皮肤主题。
+- **音频通话**：在 OBS 中添加“音频输入采集”作为麦克风源，观众就能听到你的声音。
 
-推流地址（rtmp://...）和推流密钥（隐藏显示，可复制）
+## 🔄 更新日志
+### v2.0.0 (2026-05-21)
+- 重构为 OBS 串流模式，彻底解决网络连接问题
+- 新增零门槛主持功能（无需注册、域名、API Key）
+- 集成 HLS 播放器，观众端极简操作
+- 更换默认图标，移除所有借鉴项目相关素材
+- 清理项目多余文件，优化代码结构
 
-提示信息：请打开 OBS → 设置 → 流 → 自定义流媒体服务器，填入上述地址和密钥，然后点击“开始推流”。
+## 📜 开源协议
+MIT License
+4. 版本号升级与提交
+修改 package.json 中 version 字段为 "2.0.0"。
 
-“停止共享”按钮：
+执行 npm install 同步 package-lock.json（可选）。
 
-调用 restream.endEvent(apiKey, eventId)。
+提交所有更改：
 
-从 KV 中删除房间数据（DELETE /api/room/:code 或标记过期）。
+bash
+git add -A
+git commit -m "release: v2.0.0 - OBS串流模式正式版"
+5. 分支管理：将当前分支设为 main
+当前分支为 dev/v1.0.1，执行：
 
-通知观众“推流已结束”。
+bash
+git checkout -b main
+git branch -D dev/v1.0.1   # 删除本地旧分支（可选）
+git push origin main --force   # 强制推送到远程 main
+推送成功后，指导用户前往 GitHub 仓库 → Settings → Branches，将默认分支改为 main。
 
-第六步：重构观众界面（Join.svelte）
-输入房间码后，调用 Worker GET /api/room/:code 获取 hlsUrl。
+6. 打标签并发布
+bash
+git tag v2.0.0 -m "v2.0.0 零门槛屏幕共享正式版"
+git push origin v2.0.0
 
-使用 hls.js 播放 HLS 流：
+gh release create v2.0.0 \
+  --title "v2.0.0 零门槛屏幕共享正式版" \
+  --notes "🎉 全新架构：OBS串流模式，彻底告别网络配置烦恼
 
-安装依赖：npm install hls.js
+✨ 新特性
+- 主持人无需注册、无需域名、无需 API Key
+- 观众粘贴链接即可观看，零门槛
+- 基于 OBS + MediaMTX + Cloudflare 免费隧道
+- 更换默认图标，移除所有借鉴素材
+- 全新 README，包含详细 OBS 使用教程
 
-在组件中引入 Hls，检测流地址并加载到 <video> 元素。
+📥 下载：PCConnect Setup 2.0.0.exe" \
+  release/pc-connect-2.0.0-setup.exe
+7. 最终确认
+执行 git status 确认工作区干净。
 
-显示加载状态：“正在连接流媒体…” → 连接成功后全屏播放。
+输出仓库地址：https://github.com/MondayV/screen-share
 
-移除所有旧的远程控制、批注等 WebRTC 特有功能（以后可按需重新实现）。
+提示用户：现在主分支已是 main，后续开发请基于此分支。
 
-第七步：测试与打包
-本地双端测试流程：
+注意事项
+如果生成图标脚本缺乏依赖，AI 将直接移除图标配置，使用默认 Electron 图标。
 
-主持人启动应用 → 点击开始共享 → 获得房间码和推流地址。
+强制推送 main 分支会覆盖远程，确保已备份旧代码（如有需要）。
 
-主持人在 OBS 中填入推流地址开始推流（可用摄像头或窗口捕获测试）。
-
-观众启动应用 → 输入房间码 → 应能观看到流。
-
-解决常见问题：
-
-如果 HLS 无法加载，检查 hlsUrl 是否正确，以及是否在 OBS 推流成功后几秒才播放（HLS 延迟）。
-
-确保 Worker KV 已创建且绑定。
-
-生成安装包：
-
-执行 npm run build:win
-
-升级版本号至 2.0.0，提交代码并打标签 v2.0.0
-
-上传 release/pc-connect-2.0.0-setup.exe 到 GitHub Releases
-
-第八步：最终安全提醒
-所有 token（restream API Key、ngrok authtoken）必须由用户通过设置界面输入，绝不可硬编码。
-
-撤销之前泄露的 ngrok authtoken（登录 ngrok 网站操作）。
-
-检查代码中无硬编码的 Cloudflare 账号信息。
-
-验收标准
-项目根目录无 ngrok*、cloudflared*、test-two.*、旧信令脚本。
-
-应用启动无任何 WebSocket 连接错误。
-
-主持方点击开始共享后直接看到推流地址和房间码，无需选择屏幕（由 OBS 负责）。
-
-观众输入房间码后直接观看 HLS 流，延迟 1-3 秒。
-
-安装包正常生成，安装卸载流程完好。
+如果 gh 未登录，AI 会提示先执行 gh auth login。
