@@ -76,14 +76,16 @@
 }
 
 /* ============================================================
-   HOLO-DASHBOARD: Bottom status bar with animated charts
-   (rendered via rain-container div already in App.svelte)
+   HOLO-DASHBOARD: Bottom status bar with toggle switch
    ============================================================ */
+[data-theme="cyberpunk"] #panel-toggle {
+  position: fixed; opacity: 0; pointer-events: none;
+}
+
 [data-theme="cyberpunk"] .rain-container {
   position: fixed; bottom: 0; left: 0; width: 100%; height: 42px;
-  z-index: 3; pointer-events: none;
+  z-index: 3; pointer-events: auto;
   background:
-    /* Dashboard background */
     linear-gradient(180deg, rgba(8, 20, 48, 0.85), rgba(4, 12, 28, 0.95));
   border-top: 1px solid rgba(0, 200, 255, 0.2);
   display: flex; align-items: center; padding: 0 24px;
@@ -91,73 +93,85 @@
   color: var(--text-secondary);
 }
 [data-theme="cyberpunk"] .rain-container::before {
-  content: "SYS:ONLINE  ■  NODE:ACTIVE  ■  BANDWIDTH:" attr(data-bw) "  ■  LATENCY: 12ms  ■  UPLINK:" attr(data-up);
+  content: "SYS:ONLINE  ■  NODE:ACTIVE  ■  LATENCY:12ms";
   position: absolute; left: 24px; top: 50%; transform: translateY(-50%);
 }
-/* Animated waveform bars in dashboard */
+/* Waveform bars */
 [data-theme="cyberpunk"] .rain-container::after {
   content: "";
-  position: absolute; right: 40px; top: 8px; bottom: 8px; width: 180px;
+  position: absolute; right: 120px; top: 8px; bottom: 8px; width: 140px;
   background:
     linear-gradient(0deg, var(--accent-green) 20%, transparent 20%),
     linear-gradient(0deg, var(--accent-primary) 50%, transparent 50%),
     linear-gradient(0deg, var(--accent-secondary) 35%, transparent 35%),
     linear-gradient(0deg, var(--accent-amber) 65%, transparent 65%),
     linear-gradient(0deg, var(--accent-green) 30%, transparent 30%);
-  background-size: 14px 100%, 14px 100%, 14px 100%, 14px 100%, 14px 100%;
-  background-position: 0 0, 20px 0, 40px 0, 60px 0, 80px 0;
+  background-size: 12px 100%, 12px 100%, 12px 100%, 12px 100%, 12px 100%;
+  background-position: 0 0, 18px 0, 36px 0, 54px 0, 72px 0;
   background-repeat: no-repeat;
   animation: waveformBars 2s ease-in-out infinite alternate;
 }
+/* Panel toggle switch label in dashboard */
+[data-theme="cyberpunk"] .panel-switch {
+  position: absolute; right: 24px; top: 50%; transform: translateY(-50%);
+  cursor: pointer; font-family: var(--font-mono); font-size: 12px;
+  color: rgba(140, 200, 220, 0.5);
+  letter-spacing: 2px;
+  user-select: none;
+  transition: color 0.3s;
+}
+[data-theme="cyberpunk"] .panel-switch:hover {
+  color: var(--accent-green);
+}
+#panel-toggle:checked ~ .rain-container .panel-switch {
+  color: var(--accent-green);
+  text-shadow: 0 0 8px rgba(0, 255, 140, 0.3);
+}
 
 /* ============================================================
-   HOLO-DASHBOARD: Collapsible side panel
-   Thin strip when idle, expands on hover. No control overlap.
+   HOLO-DASHBOARD: Toggle-controlled side panel
+   Default hidden. Click "◈ DIAG" in dashboard to open/close.
    ============================================================ */
 [data-theme="cyberpunk"] .rain-layer-2 {
-  position: fixed; top: 62px; right: 0; width: 8px; height: 240px;
-  z-index: 3; pointer-events: auto; cursor: pointer;
-  background: linear-gradient(180deg, rgba(0, 240, 160, 0.35), rgba(0, 200, 255, 0.2), rgba(160, 80, 255, 0.25));
-  border-radius: 4px 0 0 4px;
-  opacity: 0.7;
-  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.3s,
-              box-shadow 0.4s;
+  position: fixed; top: 62px; right: 0; width: 185px; height: fit-content;
+  max-height: 280px;
+  z-index: 3; pointer-events: auto;
+  background: rgba(6, 16, 38, 0.75);
+  backdrop-filter: blur(14px);
+  border-left: 1px solid rgba(0, 200, 255, 0.2);
+  border-bottom: 1px solid rgba(0, 200, 255, 0.12);
+  border-radius: 0 0 0 6px;
+  box-shadow: 0 0 35px rgba(0, 200, 255, 0.12);
+  padding: 10px 12px;
   overflow: hidden;
   white-space: nowrap;
-  font-family: var(--font-mono); font-size: 10px; color: transparent;
+  font-family: var(--font-mono); font-size: 10px;
+  color: rgba(0, 200, 220, 0.65);
+  /* Entrance/exit animation */
+  transform: translateX(100%);
+  opacity: 0;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.3s ease;
 }
-[data-theme="cyberpunk"] .rain-layer-2:hover {
-  width: 185px; opacity: 1;
-  background: rgba(6, 16, 38, 0.7);
-  backdrop-filter: blur(14px);
-  border-left: 1px solid rgba(0, 200, 255, 0.25);
-  border-bottom: 1px solid rgba(0, 200, 255, 0.15);
-  border-radius: 0 0 0 6px;
-  box-shadow: 0 0 35px rgba(0, 200, 255, 0.15);
-  color: rgba(0, 200, 220, 0.7);
-  padding: 10px 12px;
+/* Toggle checked = panel slides in */
+#panel-toggle:checked ~ .rain-layer-2 {
+  transform: translateX(0);
+  opacity: 1;
 }
-[data-theme="cyberpunk"] .rain-layer-2:hover::before {
-  content: "█ SYS DIAGNOSTICS";
-  display: block; color: rgba(0, 240, 160, 0.8);
-  border-bottom: 1px solid rgba(0, 180, 255, 0.15);
+[data-theme="cyberpunk"] .rain-layer-2::before {
+  content: "SYS DIAGNOSTICS";
+  display: block; color: rgba(0, 240, 160, 0.75);
+  border-bottom: 1px solid rgba(0, 180, 255, 0.12);
   padding-bottom: 6px; margin-bottom: 8px;
   letter-spacing: 2px; font-size: 10px;
+  text-align: left;
 }
-[data-theme="cyberpunk"] .rain-layer-2:hover::after {
+[data-theme="cyberpunk"] .rain-layer-2::after {
   content: "CPU [████████░░] 82%\A MEM [█████████░] 91%\A NET [████████░░] 78%\A GPU [███████░░░] 74%\A FPS [██████████] 60\A PKT [████████░░] 85%\A SIG [█████████░] 92%";
   white-space: pre; line-height: 1.7;
   display: block;
+  text-align: left;
   animation: diagBlink 3s step-end infinite;
-}
-/* Collapsed state: show a tiny pulsing indicator dot */
-[data-theme="cyberpunk"] .rain-layer-2::before {
-  content: "";
-  display: block; width: 4px; height: 4px; border-radius: 50%;
-  background: var(--accent-green);
-  margin: 0 auto;
-  animation: indicatorPulse 2s ease-in-out infinite;
 }
 
 /* Content layering */
@@ -375,8 +389,4 @@
 @keyframes diagBlink {
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.7; }
-}
-@keyframes indicatorPulse {
-  0%, 100% { opacity: 0.3; transform: scale(1); }
-  50%      { opacity: 1; transform: scale(2); }
 }
