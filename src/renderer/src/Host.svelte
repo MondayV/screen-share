@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte'
   import Swal from 'sweetalert2'
   import { L } from './translations'
   import { useNavigationEnabled, useIsHosting } from './stores'
+  import { connectToOBS, startStream, stopStream, disconnectOBS } from './lib/obs-controller'
 
   const navigationEnabled = useNavigationEnabled()
   const isHosting = useIsHosting()
@@ -11,13 +13,20 @@
   let streamKey = ''
   let hlsUrl = ''
 
+  onDestroy(() => { disconnectOBS() })
+
   const onStartClick = async (): Promise<void> => {
     try {
-      Swal.fire({ title: '正在启动串流服务...', text: '启动 MediaMTX + Cloudflared', allowOutsideClick: false, didOpen: () => Swal.showLoading() })
+      Swal.fire({ title: '正在启动...', text: '连接 OBS + 启动串流服务', allowOutsideClick: false, didOpen: () => Swal.showLoading() })
+
+      await connectToOBS()
+
       const result = await window.PcConnectApi.startStreaming()
       publicUrl = result.publicUrl
       streamKey = result.streamKey
       hlsUrl = `${publicUrl}/${streamKey}/index.m3u8`
+
+      await startStream()
       Swal.close()
 
       sessionActive = true
@@ -25,7 +34,8 @@
       $isHosting = true
     } catch (e) {
       console.error('Start failed:', e)
-      Swal.fire({ position: 'top-end', icon: 'error', title: '启动失败，请确认已安装 MediaMTX 和 cloudflared', showConfirmButton: false, timer: 3000 })
+      Swal.close()
+      Swal.fire({ position: 'top-end', icon: 'error', title: '启动失败，请确认 OBS 已开启并安装了 MediaMTX 和 cloudflared', showConfirmButton: false, timer: 3000 })
     }
   }
 
@@ -39,6 +49,8 @@
       cancelButtonText: '取消'
     })
     if (!result.isConfirmed) return
+    try { await stopStream() } catch {}
+    disconnectOBS()
     try { await window.PcConnectApi.stopStreaming() } catch {}
     publicUrl = ''
     streamKey = ''
@@ -74,9 +86,9 @@
     </div>
 
     <div class="box">
-      <p class="heading">OBS 推流配置</p>
-      <p class="mb-2">1. 打开 OBS → 设置 → 流</p>
-      <p class="mb-2">2. 服务选择「自定义流媒体服务器」</p>
+      <p class="heading">OBS 推流信息</p>
+      <p class="mb-2 has-text-success">✅ OBS 已连接，正在推流</p>
+      <p class="mb-2">首次使用请在 OBS 设置 → 流中配置：</p>
       <div class="field">
         <label class="label">服务器</label>
         <div class="control">
@@ -93,7 +105,6 @@
         <span class="icon"><i class="fas fa-copy"></i></span>
         <span>复制服务器+密钥</span>
       </button>
-      <p class="mt-3">3. 点击「开始推流」</p>
     </div>
 
     <div class="has-text-centered mt-5">
@@ -108,7 +119,7 @@
         <span class="icon"><i class="fas fa-play"></i></span>
         <span>开始共享</span>
       </button>
-      <p class="has-text-grey mt-3">需要安装 MediaMTX (C:\mediamtx) 和 cloudflared</p>
+      <p class="has-text-grey mt-3">需要 OBS Studio（WebSocket 端口 4455）+ MediaMTX + cloudflared</p>
     </div>
   {/if}
 </div>
