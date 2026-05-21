@@ -1,7 +1,7 @@
 import { writable } from 'svelte/store'
 
 const KEY = 'pc-connect-theme'
-const saved = localStorage.getItem(KEY) || 'default'
+const saved = localStorage.getItem(KEY) || 'dark'
 
 export const theme = writable(saved)
 

@@ -5,11 +5,8 @@
   import { theme } from './theme'
 
   const skinOptions = [
-    { value: 'default', label: '默认' },
     { value: 'dark', label: '深色' },
-    { value: 'cyberpunk', label: '赛博朋克' },
-    { value: 'journal', label: '手账涂鸦' },
-    { value: 'pixel', label: '像素比特' }
+    { value: 'cyberpunk', label: '赛博朋克' }
   ]
 
   let colorPreviewIcon: HTMLElement
