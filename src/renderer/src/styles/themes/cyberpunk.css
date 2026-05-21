@@ -302,11 +302,8 @@
    ============================================================ */
 [data-theme="cyberpunk"] h1,
 [data-theme="cyberpunk"] .title {
-  font-weight: 300; letter-spacing: 3px;
-  text-shadow:
-    0 0 35px rgba(0, 220, 255, 0.25),
-    0 0 65px rgba(0, 160, 255, 0.08);
-  color: #e0f4ff;
+  text-align: left;
+  color: var(--text-primary);
 }
 [data-theme="cyberpunk"] .heading {
   color: rgba(160, 200, 220, 0.55);
