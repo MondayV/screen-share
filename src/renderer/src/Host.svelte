@@ -2,11 +2,12 @@
   import { onDestroy } from 'svelte'
   import Swal from 'sweetalert2'
   import { L } from './translations'
-  import { useNavigationEnabled, useIsHosting } from './stores'
+  import { useNavigationEnabled, useIsHosting, useActiveView } from './stores'
   import { connectToOBS, startStream, stopStream, disconnectOBS } from './lib/obs-controller'
 
   const navigationEnabled = useNavigationEnabled()
   const isHosting = useIsHosting()
+  const activeView = useActiveView()
 
   let sessionActive = false
   let publicUrl = ''
@@ -35,7 +36,21 @@
     } catch (e) {
       console.error('Start failed:', e)
       Swal.close()
-      Swal.fire({ position: 'top-end', icon: 'error', title: '启动失败，请确认 OBS 已开启并安装了 MediaMTX 和 cloudflared', showConfirmButton: false, timer: 3000 })
+      const msg = (e as Error).message || ''
+      if (msg.includes('密码') || msg.includes('authentication')) {
+        Swal.fire({
+          icon: 'error',
+          title: 'OBS 连接失败',
+          text: msg,
+          confirmButtonText: '打开设置修改密码',
+          showCancelButton: true,
+          cancelButtonText: '关闭'
+        }).then((r) => {
+          if (r.isConfirmed) $activeView = 'settings'
+        })
+      } else {
+        Swal.fire({ position: 'top-end', icon: 'error', title: msg || '启动失败', showConfirmButton: false, timer: 3000 })
+      }
     }
   }
 

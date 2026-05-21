@@ -1,163 +1,107 @@
-# 指令：OBS WebSocket 密码安全加密存储与自动读取
+# 指令：优化 OBS 密码错误提示，增加快捷修改入口
 
 ## 目标
-- 使用 Electron 内置 `safeStorage` 对 OBS 密码进行加密存储，避免明文泄露
-- 提供设置页面让用户输入密码并保存
-- 应用启动时自动加载密码，连接 OBS 无需每次手动输入
-- 保持现有皮肤、打包流程不变
+- 当 OBS WebSocket 连接因密码错误失败时，提供友好的错误提示框，并包含一个“打开设置”按钮。
+- 点击按钮后自动打开设置面板，用户修改密码后可直接重试。
+- 保留现有的安全存储和设置页面逻辑。
 
-## 修改文件清单
-- `src/main/index.ts`（主进程，添加 IPC）
-- `src/preload/index.ts`（暴露 API 给渲染进程）
-- `src/renderer/src/lib/obs-controller.ts`（使用 IPC 获取密码）
-- `src/renderer/src/SettingsModal.svelte`（或实际设置组件，添加输入框）
-- `src/renderer/src/Host.svelte`（启动时连接优化）
+## 修改文件
+- `src/renderer/src/Host.svelte`
+- `src/renderer/src/SettingsModal.svelte`（如果存在独立的设置弹窗组件）
 
-## 执行步骤
+## 修改步骤
 
-### 1. 主进程添加加密存储 IPC 通道
-在 `src/main/index.ts` 中添加以下内容：
+### 1. 在 Host.svelte 中添加错误处理与设置弹窗控制
+在 `<script>` 中增加变量和方法：
 
 ```ts
-import { safeStorage, app } from 'electron';
-import * as fs from 'fs';
-import * as path from 'path';
+import { connectToOBS, startStream, stopStream, disconnectOBS } from './lib/obs-controller';
+import SettingsModal from './SettingsModal.svelte'; // 路径根据实际调整
 
-const passwordFilePath = path.join(app.getPath('userData'), 'obs-password.enc');
+let showSettings = false;  // 控制设置弹窗显示
+let errorMessage = '';     // 错误消息
 
-ipcMain.handle('save-obs-password', async (event, password: string) => {
-  if (safeStorage.isEncryptionAvailable()) {
-    const encrypted = safeStorage.encryptString(password);
-    fs.writeFileSync(passwordFilePath, encrypted);
-    return true;
-  }
-  return false;
-});
-
-ipcMain.handle('get-obs-password', async () => {
-  if (safeStorage.isEncryptionAvailable() && fs.existsSync(passwordFilePath)) {
-    const encrypted = fs.readFileSync(passwordFilePath);
-    return safeStorage.decryptString(encrypted);
-  }
-  return '';
-});
-2. 预加载脚本暴露 API
-在 src/preload/index.ts 的 contextBridge 中添加：
-
-ts
-contextBridge.exposeInMainWorld('electronAPI', {
-  // ...已有方法
-  saveObsPassword: (password: string) => ipcRenderer.invoke('save-obs-password', password),
-  getObsPassword: () => ipcRenderer.invoke('get-obs-password'),
-});
-3. 修改 OBS 控制器使用异步获取密码
-更新 src/renderer/src/lib/obs-controller.ts：
-
-ts
-import OBSWebSocket from 'obs-websocket-js';
-
-let obs: OBSWebSocket | null = null;
-
-async function getOBSWebSocketPassword(): Promise<string> {
-  if (window.electronAPI?.getObsPassword) {
-    return await window.electronAPI.getObsPassword();
-  }
-  return '';
+function openSettings() {
+  showSettings = true;
 }
 
-export async function connectToOBS(): Promise<void> {
-  obs = new OBSWebSocket();
-  const password = await getOBSWebSocketPassword();
+async function startShare() {
   try {
-    await obs.connect('ws://localhost:4455', password);
-    console.log('[OBS] 已连接');
+    errorMessage = '';
+    await connectToOBS();
+    // ... 原有启动逻辑
   } catch (err) {
-    console.error('[OBS] 连接失败:', err);
-    const msg = (err as any).message || '';
-    if (msg.includes('authentication')) {
-      throw new Error('OBS 身份验证失败，请在设置中更新 WebSocket 密码');
+    errorMessage = err.message || '启动失败';
+    // 如果是认证错误，提供快捷入口
+    if (errorMessage.includes('身份验证失败') || errorMessage.includes('密码错误')) {
+      // 将在 UI 中显示带按钮的错误提示
     }
-    throw new Error('无法连接到 OBS，请确认 WebSocket 已启用');
+    // 不自动弹出 alert，改为在界面上显示错误
   }
 }
-
-export async function startStream(): Promise<void> {
-  if (!obs) throw new Error('OBS 未连接');
-  await obs.call('StartStream');
-}
-
-export async function stopStream(): Promise<void> {
-  if (!obs) return;
-  await obs.call('StopStream');
-}
-
-export function disconnectOBS(): void {
-  if (obs) {
-    obs.disconnect();
-    obs = null;
-  }
-}
-4. 设置页面添加密码输入框
-找到设置组件（例如 SettingsModal.svelte），添加：
+2. 在模板中添加错误提示区域和设置弹窗
+在 Host 界面的合适位置（例如按钮下方），添加：
 
 svelte
-<script>
-  let obsPasswordInput = '';
-  let passwordSaved = false;
+{#if errorMessage}
+  <div class="error-notification">
+    <span>{errorMessage}</span>
+    {#if errorMessage.includes('身份验证失败') || errorMessage.includes('密码错误')}
+      <button on:click={openSettings}>打开设置</button>
+    {/if}
+    <button on:click={() => errorMessage = ''}>关闭</button>
+  </div>
+{/if}
 
-  async function loadPassword() {
-    if (window.electronAPI?.getObsPassword) {
-      obsPasswordInput = await window.electronAPI.getObsPassword();
-    }
-  }
+<!-- 设置弹窗 -->
+{#if showSettings}
+  <SettingsModal on:close={() => showSettings = false} />
+{/if}
+3. 确保 SettingsModal 支持关闭事件
+如果 SettingsModal 尚未支持关闭事件，修改它，添加一个 close 事件调度：
 
-  async function savePassword() {
-    if (window.electronAPI?.saveObsPassword) {
-      await window.electronAPI.saveObsPassword(obsPasswordInput);
-      passwordSaved = true;
-      setTimeout(() => passwordSaved = false, 2000);
-    }
-  }
+ts
+// 在 SettingsModal.svelte 的 script 中
+import { createEventDispatcher } from 'svelte';
+const dispatch = createEventDispatcher();
 
-  import { onMount } from 'svelte';
-  onMount(loadPassword);
-</script>
+function closeSettings() {
+  dispatch('close');
+}
+在设置面板的关闭按钮或背景点击时调用 closeSettings()。
 
-<div class="setting-item">
-  <label for="obs-password">OBS WebSocket 密码</label>
-  <input
-    type="password"
-    id="obs-password"
-    bind:value={obsPasswordInput}
-    placeholder="填入 OBS 生成的密码"
-  />
-  <button on:click={savePassword}>保存</button>
-  {#if passwordSaved}
-    <span style="color: green; margin-left: 8px;">已保存</span>
-  {/if}
-</div>
-5. Host 启动时自动尝试连接
-在 Host.svelte 的 startShare 中调用 connectToOBS 即可，无需更改。
+4. 调整样式
+为错误通知添加基础样式，可使用现有皮肤变量：
 
-6. 清理本地明文密码残留
-确保代码中不再有硬编码的密码或从 localStorage 读取密码的逻辑。删除 localStorage.getItem('obs-websocket-password') 相关代码。
+css
+.error-notification {
+  background: var(--accent-secondary, #ff6b6b);
+  color: white;
+  padding: 10px;
+  border-radius: 4px;
+  margin: 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.error-notification button {
+  background: white;
+  color: #333;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+5. 测试
+错误密码场景：输入错误密码保存，点击“开始共享”，应出现错误提示和“打开设置”按钮。
 
-7. 测试验证
-构建应用：rm -rf release out && npm run build:win
+点击“打开设置”应弹出设置面板，修改密码保存后关闭面板，重新点击“开始共享”应连接成功。
 
-在 OBS 中设置/生成一个密码
-
-打开应用，进入设置，输入密码并保存
-
-点击“开始共享”，确认 OBS 自动连接并推流
-
-关闭应用再打开，无需再次输入密码，直接可用
+正确密码场景：直接连接成功，不出现错误提示。
 
 验收标准
-OBS 密码在磁盘上以加密形式存储（userData/obs-password.enc）
+密码错误时，不再仅是控制台报错，而是界面显示友好提示。
 
-用户可在设置中修改密码并即时生效
+用户可通过提示框中的按钮直接打开设置修改密码。
 
-连接 OBS 时自动使用加密存储的密码，无需每次手动输入
-
-若密码错误，给出明确提示
+设置面板可正常关闭，不阻塞主界面。
