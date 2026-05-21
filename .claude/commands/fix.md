@@ -1,98 +1,163 @@
-# 指令：在设置面板中添加 OBS WebSocket 密码输入框
+# 指令：OBS WebSocket 密码安全加密存储与自动读取
 
 ## 目标
-让用户可以在应用设置界面中输入 OBS WebSocket 连接密码，并持久化保存到 localStorage，避免硬编码密码在代码中。
+- 使用 Electron 内置 `safeStorage` 对 OBS 密码进行加密存储，避免明文泄露
+- 提供设置页面让用户输入密码并保存
+- 应用启动时自动加载密码，连接 OBS 无需每次手动输入
+- 保持现有皮肤、打包流程不变
 
-## 修改文件
-- `src/renderer/src/SettingsModal.svelte`（或实际的设置面板组件）
-- `src/renderer/src/lib/obs-controller.ts`（已存在）
+## 修改文件清单
+- `src/main/index.ts`（主进程，添加 IPC）
+- `src/preload/index.ts`（暴露 API 给渲染进程）
+- `src/renderer/src/lib/obs-controller.ts`（使用 IPC 获取密码）
+- `src/renderer/src/SettingsModal.svelte`（或实际设置组件，添加输入框）
+- `src/renderer/src/Host.svelte`（启动时连接优化）
 
-## 修改步骤
+## 执行步骤
 
-### 1. 在设置面板中添加密码输入框
-找到设置面板组件，在合适位置（例如“OBS 连接设置”区域）添加以下 HTML：
+### 1. 主进程添加加密存储 IPC 通道
+在 `src/main/index.ts` 中添加以下内容：
 
-```html
-<div class="setting-item">
-  <label for="obs-password">OBS WebSocket 密码</label>
-  <input
-    type="password"
-    id="obs-password"
-    bind:value={obsWebSocketPassword}
-    placeholder="留空表示无密码"
-  />
-  <button on:click={saveOBSPassword}>保存</button>
-</div>
-2. 在组件的 <script> 中添加变量和方法
-ts
-let obsWebSocketPassword = '';
+```ts
+import { safeStorage, app } from 'electron';
+import * as fs from 'fs';
+import * as path from 'path';
 
-// 读取已保存的密码
-function loadOBSPassword() {
-  const saved = localStorage.getItem('obs-websocket-password');
-  if (saved) {
-    obsWebSocketPassword = saved;
+const passwordFilePath = path.join(app.getPath('userData'), 'obs-password.enc');
+
+ipcMain.handle('save-obs-password', async (event, password: string) => {
+  if (safeStorage.isEncryptionAvailable()) {
+    const encrypted = safeStorage.encryptString(password);
+    fs.writeFileSync(passwordFilePath, encrypted);
+    return true;
   }
-}
-
-// 保存密码到 localStorage
-function saveOBSPassword() {
-  localStorage.setItem('obs-websocket-password', obsWebSocketPassword.trim());
-  // 可选：提示保存成功
-}
-
-// 在 onMount 中加载
-import { onMount } from 'svelte';
-onMount(() => {
-  loadOBSPassword();
+  return false;
 });
-3. 更新 obs-controller.ts 使用 localStorage 密码
-在 src/renderer/src/lib/obs-controller.ts 中，修改 connectToOBS 函数获取密码的逻辑，确保从 localStorage 读取：
+
+ipcMain.handle('get-obs-password', async () => {
+  if (safeStorage.isEncryptionAvailable() && fs.existsSync(passwordFilePath)) {
+    const encrypted = fs.readFileSync(passwordFilePath);
+    return safeStorage.decryptString(encrypted);
+  }
+  return '';
+});
+2. 预加载脚本暴露 API
+在 src/preload/index.ts 的 contextBridge 中添加：
 
 ts
-function getOBSWebSocketPassword(): string {
-  return localStorage.getItem('obs-websocket-password') || '';
+contextBridge.exposeInMainWorld('electronAPI', {
+  // ...已有方法
+  saveObsPassword: (password: string) => ipcRenderer.invoke('save-obs-password', password),
+  getObsPassword: () => ipcRenderer.invoke('get-obs-password'),
+});
+3. 修改 OBS 控制器使用异步获取密码
+更新 src/renderer/src/lib/obs-controller.ts：
+
+ts
+import OBSWebSocket from 'obs-websocket-js';
+
+let obs: OBSWebSocket | null = null;
+
+async function getOBSWebSocketPassword(): Promise<string> {
+  if (window.electronAPI?.getObsPassword) {
+    return await window.electronAPI.getObsPassword();
+  }
+  return '';
 }
 
 export async function connectToOBS(): Promise<void> {
   obs = new OBSWebSocket();
-  const password = getOBSWebSocketPassword();
+  const password = await getOBSWebSocketPassword();
   try {
     await obs.connect('ws://localhost:4455', password);
     console.log('[OBS] 已连接');
   } catch (err) {
     console.error('[OBS] 连接失败:', err);
-    throw new Error('无法连接到 OBS，请确认 WebSocket 已启用且密码正确');
+    const msg = (err as any).message || '';
+    if (msg.includes('authentication')) {
+      throw new Error('OBS 身份验证失败，请在设置中更新 WebSocket 密码');
+    }
+    throw new Error('无法连接到 OBS，请确认 WebSocket 已启用');
   }
 }
-4. 确保密码字段样式与现有皮肤一致
-使用已有的 CSS 变量和类名，避免破坏 UI 风格。如：
 
-css
-.setting-item {
-  margin: 8px 0;
+export async function startStream(): Promise<void> {
+  if (!obs) throw new Error('OBS 未连接');
+  await obs.call('StartStream');
 }
-.setting-item label {
-  display: block;
-  font-size: 14px;
-}
-.setting-item input {
-  width: 100%;
-  padding: 6px;
-  margin: 4px 0;
-}
-5. 重新构建并测试
-清理：rm -rf release out
 
-构建：npm run build:win
+export async function stopStream(): Promise<void> {
+  if (!obs) return;
+  await obs.call('StopStream');
+}
 
-测试：打开应用 → 进入设置 → 输入 OBS WebSocket 密码 → 保存 → 开始共享，确认能正常连接 OBS。
+export function disconnectOBS(): void {
+  if (obs) {
+    obs.disconnect();
+    obs = null;
+  }
+}
+4. 设置页面添加密码输入框
+找到设置组件（例如 SettingsModal.svelte），添加：
+
+svelte
+<script>
+  let obsPasswordInput = '';
+  let passwordSaved = false;
+
+  async function loadPassword() {
+    if (window.electronAPI?.getObsPassword) {
+      obsPasswordInput = await window.electronAPI.getObsPassword();
+    }
+  }
+
+  async function savePassword() {
+    if (window.electronAPI?.saveObsPassword) {
+      await window.electronAPI.saveObsPassword(obsPasswordInput);
+      passwordSaved = true;
+      setTimeout(() => passwordSaved = false, 2000);
+    }
+  }
+
+  import { onMount } from 'svelte';
+  onMount(loadPassword);
+</script>
+
+<div class="setting-item">
+  <label for="obs-password">OBS WebSocket 密码</label>
+  <input
+    type="password"
+    id="obs-password"
+    bind:value={obsPasswordInput}
+    placeholder="填入 OBS 生成的密码"
+  />
+  <button on:click={savePassword}>保存</button>
+  {#if passwordSaved}
+    <span style="color: green; margin-left: 8px;">已保存</span>
+  {/if}
+</div>
+5. Host 启动时自动尝试连接
+在 Host.svelte 的 startShare 中调用 connectToOBS 即可，无需更改。
+
+6. 清理本地明文密码残留
+确保代码中不再有硬编码的密码或从 localStorage 读取密码的逻辑。删除 localStorage.getItem('obs-websocket-password') 相关代码。
+
+7. 测试验证
+构建应用：rm -rf release out && npm run build:win
+
+在 OBS 中设置/生成一个密码
+
+打开应用，进入设置，输入密码并保存
+
+点击“开始共享”，确认 OBS 自动连接并推流
+
+关闭应用再打开，无需再次输入密码，直接可用
 
 验收标准
-设置面板出现 OBS WebSocket 密码输入框
+OBS 密码在磁盘上以加密形式存储（userData/obs-password.enc）
 
-密码保存到 localStorage，关闭应用再打开仍保留
+用户可在设置中修改密码并即时生效
 
-连接 OBS 时使用已保存的密码，无需用户每次输入
+连接 OBS 时自动使用加密存储的密码，无需每次手动输入
 
-样式与当前皮肤一致
+若密码错误，给出明确提示

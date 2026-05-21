@@ -1,7 +1,8 @@
-import { app, shell, BrowserWindow, session, desktopCapturer } from 'electron'
+import { app, shell, BrowserWindow, session, desktopCapturer, safeStorage, ipcMain } from 'electron'
 import path from 'path'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import fs from 'fs'
 import icon from '../../resources/icon.png?asset'
 import { windowStateKeeper } from './stateKeeper'
 import { ipcMainHandlersInit } from './ipcMainHandlers'
@@ -104,6 +105,21 @@ app.whenReady().then(async () => {
   })
 
   ipcMainHandlersInit()
+
+  const passwordFile = path.join(app.getPath('userData'), 'obs-password.enc')
+  ipcMain.handle('save-obs-password', (_e, pwd: string) => {
+    if (safeStorage.isEncryptionAvailable()) {
+      fs.writeFileSync(passwordFile, safeStorage.encryptString(pwd))
+      return true
+    }
+    return false
+  })
+  ipcMain.handle('get-obs-password', () => {
+    if (safeStorage.isEncryptionAvailable() && fs.existsSync(passwordFile)) {
+      return safeStorage.decryptString(fs.readFileSync(passwordFile))
+    }
+    return ''
+  })
 
   await createWindow()
   const coldStartUrl = process.argv.find((arg) => arg.startsWith(CUSTOM_PROTOCOL + '://'))

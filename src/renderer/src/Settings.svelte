@@ -73,8 +73,8 @@
       }, 2000)
     }
   }
-  function saveOBSPassword(): void {
-    localStorage.setItem('obs-websocket-password', obsPassword.trim())
+  async function saveOBSPassword(): Promise<void> {
+    await window.PcConnectApi.saveObsPassword(obsPassword.trim())
   }
 
   onMount(async () => {
@@ -84,7 +84,7 @@
     language = settings.language
     isMicrophoneEnabledOnConnect = settings.isMicrophoneEnabledOnConnect
     iceServersValue = settings.iceServers.map((srv) => JSON.stringify(srv)).join('\n')
-    obsPassword = localStorage.getItem('obs-websocket-password') || ''
+    obsPassword = await window.PcConnectApi.getObsPassword()
   })
 </script>
 

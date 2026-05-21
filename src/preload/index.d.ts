@@ -34,6 +34,11 @@ declare global {
         iceServers: IceServer[]
       }>
       getAppVersion: () => Promise<string>
+      getSources: () => Promise<{ id: string; name: string; thumbnail: string }[]>
+      startStreaming: () => Promise<{ publicUrl: string; streamKey: string }>
+      stopStreaming: () => Promise<void>
+      saveObsPassword: (pwd: string) => Promise<boolean>
+      getObsPassword: () => Promise<string>
     }
   }
 }

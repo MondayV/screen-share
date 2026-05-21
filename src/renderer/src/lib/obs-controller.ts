@@ -2,20 +2,26 @@ import OBSWebSocket from 'obs-websocket-js'
 
 let obs: OBSWebSocket | null = null
 
-function getOBSPassword(): string {
-  return localStorage.getItem('obs-websocket-password') || ''
+async function getOBSPassword(): Promise<string> {
+  try {
+    return await window.PcConnectApi.getObsPassword()
+  } catch {
+    return ''
+  }
 }
 
 export async function connectToOBS(): Promise<void> {
   obs = new OBSWebSocket()
-  const password = getOBSPassword()
-  await obs.connect('ws://localhost:4455', password)
-}
-
-export async function getStreamStatus(): Promise<boolean> {
-  if (!obs) return false
-  const { outputActive } = await obs.call('GetStreamStatus')
-  return outputActive
+  const password = await getOBSPassword()
+  try {
+    await obs.connect('ws://localhost:4455', password)
+  } catch (err) {
+    const msg = (err as Error).message || ''
+    if (msg.includes('authentication') || msg.includes('Authentication')) {
+      throw new Error('OBS 密码错误，请在设置中更新 WebSocket 密码')
+    }
+    throw new Error('无法连接到 OBS，请确认 OBS 已启动并开启 WebSocket 服务')
+  }
 }
 
 export async function startStream(): Promise<void> {

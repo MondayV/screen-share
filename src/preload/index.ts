@@ -71,6 +71,12 @@ const PcConnectApi = {
   },
   stopStreaming: async (): Promise<void> => {
     ipcRenderer.invoke('stopStreaming')
+  },
+  saveObsPassword: async (pwd: string): Promise<boolean> => {
+    return await ipcRenderer.invoke('save-obs-password', pwd)
+  },
+  getObsPassword: async (): Promise<string> => {
+    return await ipcRenderer.invoke('get-obs-password')
   }
 }
 
