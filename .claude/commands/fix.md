@@ -1,48 +1,95 @@
-# 指令：修复观众方 CSP 阻止 HLS 流加载的问题
+# 指令：修复 HLS 流 404 导致反复弹窗的问题
 
-## 问题
-观众方无法播放 HLS 流，控制台报错：
-- `Refused to connect to 'https://...trycloudflare.com/...' because it violates CSP directive: "connect-src ..."`
-- `Refused to load media from 'blob:...' because it violates CSP directive: "default-src 'self'"`
+## 问题描述
+观众方连接后能看到画面，但反复弹出“无法加载流，请检查设置”。控制台显示部分请求返回 404。
+原因是 HLS 媒体分片请求失败时，应用直接弹窗报错且未做去重处理，导致错误循环提示。
 
-## 根本原因
-`src/renderer/index.html` 的 `<meta>` 标签中：
-1. `connect-src` 缺少 `https://*.trycloudflare.com`
-2. 未设置 `media-src`，导致 `blob:` 视频分片被 `default-src 'self'` 阻止
+## 修复目标
+1. 改进 HLS 播放器的错误处理：区分致命错误（流不存在）和可恢复错误（网络抖动），避免重复弹窗。
+2. 增加自动重试机制：网络错误静默重试，致命错误提示用户检查推流状态。
+3. 优化错误提示：仅当错误状态改变时显示一次通知，不循环弹窗。
 
-## 修复步骤
+## 修改文件
+`src/renderer/src/Join.svelte` 或包含 HLS 播放器初始化的组件。
 
-### 1. 更新 CSP 元标签
-在 `src/renderer/index.html` 中找到 `<meta http-equiv="Content-Security-Policy" ...>`，修改为包含以下内容：
+## 修改内容
 
-```html
-<meta http-equiv="Content-Security-Policy" content="
-  default-src 'self';
-  script-src 'self' 'unsafe-inline';
-  style-src 'self' 'unsafe-inline';
-  img-src 'self' data:;
-  font-src 'self';
-  connect-src 'self' ws: wss: https://*.workers.dev https://*.trycloudflare.com;
-  media-src 'self' blob: https://*.trycloudflare.com;
-">
-2. 确保修改生效
-保存文件
+### 1. 引入 Hls 并添加错误监听
+在 `<script>` 中确保导入 `Hls`，并在创建播放器实例后绑定错误事件。
 
-清理构建：rm -rf release out
+```ts
+import Hls from 'hls.js';
 
-重新构建：npm run build:win
+let hls: Hls | null = null;
+let errorShown = false; // 防止重复弹窗
 
-3. 验证
-主持方启动共享
+function startPlayback(url: string) {
+  if (hls) {
+    hls.destroy();
+    hls = null;
+  }
+  errorShown = false;
 
-观众方输入链接观看
+  if (Hls.isSupported()) {
+    hls = new Hls({
+      enableWorker: true,
+      lowLatencyMode: false,
+    });
+    hls.loadSource(url);
+    hls.attachMedia(videoElement);
 
-控制台不再出现 CSP 相关错误
+    hls.on(Hls.Events.ERROR, (event, data) => {
+      if (data.fatal) {
+        // 致命错误：弹窗提示并停止自动重试
+        if (!errorShown) {
+          errorShown = true;
+          showNotification('无法加载流，请确认主持人已开始推流或流密钥正确');
+        }
+        hls?.destroy();
+        hls = null;
+      } else {
+        // 非致命错误：静默重试，不弹窗
+        console.warn('[HLS] 非致命错误，自动重试中...', data.details);
+      }
+    });
+  } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+    videoElement.src = url;
+  }
+}
+2. 添加通知函数（去重）
+在组件中增加一个简单的通知显示逻辑，同一个错误仅显示一次。
 
-视频正常播放
+ts
+let notification = '';
 
-注意事项
-如果项目中有其他地方动态注入 CSP（如主进程 webRequest.onHeadersReceived），请一并修改，确保最终生效。
+function showNotification(msg: string) {
+  // 仅显示一次相同消息
+  if (notification === msg) return;
+  notification = msg;
+  // 3 秒后自动清除（或通过关闭按钮）
+  setTimeout(() => { notification = ''; }, 5000);
+}
+3. 在模板中显示错误通知
+在 Join.svelte 的 HTML 部分，添加通知区域：
 
-保存后执行 rm -rf release out && npm run build:win，安装新版本测试即可。
+html
+{#if notification}
+  <div class="notification error">{notification}</div>
+{/if}
+4. 清理播放器
+在组件销毁时（onDestroy）销毁 HLS 实例。
 
+ts
+import { onDestroy } from 'svelte';
+onDestroy(() => {
+  if (hls) {
+    hls.destroy();
+    hls = null;
+  }
+});
+验证
+主持方在 未推流 的情况下生成播放链接，观众方输入链接后应只弹一次错误提示，不再循环弹窗。
+
+主持方开始推流后，观众方重新加载链接（重新点击观看），应能正常播放，无错误提示。
+
+播放过程中若网络抖动导致分片失败，播放器应静默重试，不弹窗。

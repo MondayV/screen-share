@@ -14,6 +14,7 @@
   let joinAttempting = false
   let hls: Hls | null = null
   let zoomFactor = 1
+  let errorShown = false
 
   onDestroy(() => {
     if (hls) { hls.destroy(); hls = null }
@@ -22,6 +23,7 @@
   const onJoinClick = async (): Promise<void> => {
     if (!playUrl || joinAttempting) return
     joinAttempting = true
+    errorShown = false
     try {
       Swal.fire({ title: '正在连接...', allowOutsideClick: false, didOpen: () => Swal.showLoading() })
       if (Hls.isSupported()) {
@@ -35,8 +37,13 @@
           $navigationEnabled = false
           Swal.close()
         })
-        hls.on(Hls.Events.ERROR, () => {
-          Swal.fire({ position: 'top-end', icon: 'error', title: '无法加载流，请检查链接', showConfirmButton: false, timer: 2000 })
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (data.fatal) {
+            if (!errorShown) {
+              errorShown = true
+              Swal.fire({ position: 'top-end', icon: 'error', title: '无法加载流，请确认主持人已开始推流', showConfirmButton: false, timer: 3000 })
+            }
+          }
         })
       } else if (remoteScreen.canPlayType('application/vnd.apple.mpegurl')) {
         remoteScreen.src = playUrl
