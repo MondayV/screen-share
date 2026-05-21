@@ -15,51 +15,75 @@
   let hls: Hls | null = null
   let zoomFactor = 1
   let errorShown = false
+  let retryTimer: ReturnType<typeof setTimeout> | null = null
 
   onDestroy(() => {
+    if (retryTimer) clearTimeout(retryTimer)
     if (hls) { hls.destroy(); hls = null }
   })
 
-  const onJoinClick = async (): Promise<void> => {
-    if (!playUrl || joinAttempting) return
-    joinAttempting = true
-    errorShown = false
+  async function checkStreamAvailable(url: string): Promise<boolean> {
     try {
-      Swal.fire({ title: '正在连接...', allowOutsideClick: false, didOpen: () => Swal.showLoading() })
-      if (Hls.isSupported()) {
-        hls = new Hls()
-        hls.loadSource(playUrl)
-        hls.attachMedia(remoteScreen)
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          remoteScreen.play()
-          isStreaming = true
-          $isWatching = true
-          $navigationEnabled = false
-          Swal.close()
-        })
-        hls.on(Hls.Events.ERROR, (_event, data) => {
-          if (data.fatal) {
-            if (!errorShown) {
-              errorShown = true
-              Swal.fire({ position: 'top-end', icon: 'error', title: '无法加载流，请确认主持人已开始推流', showConfirmButton: false, timer: 3000 })
-            }
-          }
-        })
-      } else if (remoteScreen.canPlayType('application/vnd.apple.mpegurl')) {
-        remoteScreen.src = playUrl
+      const res = await fetch(url, { method: 'HEAD' })
+      return res.ok
+    } catch {
+      return false
+    }
+  }
+
+  function startPlayback(url: string): void {
+    if (Hls.isSupported()) {
+      hls = new Hls()
+      hls.loadSource(url)
+      hls.attachMedia(remoteScreen)
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
         remoteScreen.play()
         isStreaming = true
         $isWatching = true
         $navigationEnabled = false
         Swal.close()
-      } else {
-        throw new Error('HLS not supported')
-      }
-    } catch (e) {
-      console.error('Join failed:', e)
-      Swal.fire({ position: 'top-end', icon: 'error', title: '连接失败', showConfirmButton: false, timer: 2000 })
-    } finally {
+      })
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) {
+          if (!errorShown) {
+            errorShown = true
+            Swal.fire({ position: 'top-end', icon: 'error', title: '无法加载流', showConfirmButton: false, timer: 3000 })
+          }
+        }
+      })
+    } else if (remoteScreen.canPlayType('application/vnd.apple.mpegurl')) {
+      remoteScreen.src = url
+      remoteScreen.play()
+      isStreaming = true
+      $isWatching = true
+      $navigationEnabled = false
+      Swal.close()
+    }
+  }
+
+  async function waitForStream(url: string): Promise<void> {
+    const available = await checkStreamAvailable(url)
+    if (available) {
+      startPlayback(url)
+    } else {
+      retryTimer = setTimeout(() => waitForStream(url), 5000)
+    }
+  }
+
+  const onJoinClick = async (): Promise<void> => {
+    if (!playUrl || joinAttempting) return
+    joinAttempting = true
+    errorShown = false
+    if (retryTimer) clearTimeout(retryTimer)
+    Swal.fire({ title: '正在连接...', allowOutsideClick: false, didOpen: () => Swal.showLoading() })
+    const available = await checkStreamAvailable(playUrl)
+    if (available) {
+      startPlayback(playUrl)
       joinAttempting = false
+    } else {
+      Swal.close()
+      joinAttempting = false
+      waitForStream(playUrl)
     }
   }
 
@@ -71,6 +95,7 @@
       cancelButtonText: '取消'
     })
     if (!result.isConfirmed) return
+    if (retryTimer) clearTimeout(retryTimer)
     if (hls) { hls.destroy(); hls = null }
     remoteScreen.src = ''
     isStreaming = false
@@ -102,6 +127,12 @@
           </button>
         </div>
       </div>
+    </div>
+  {:else if joinAttempting}
+    <div class="has-text-centered">
+      <p class="is-size-5 mb-3">正在等待主持人推流...</p>
+      <progress class="progress is-small is-primary" max="100" style="width: 300px; margin: 0 auto;"></progress>
+      <p class="has-text-grey is-size-7 mt-2">每 5 秒自动检测，无需手动操作</p>
     </div>
   {:else}
     <div class="has-text-centered">
