@@ -2,6 +2,15 @@
   import { onMount } from 'svelte'
   import ColorPicker from 'svelte-awesome-color-picker'
   import { L } from './translations'
+  import { theme } from './theme'
+
+  const skinOptions = [
+    { value: 'default', label: '默认' },
+    { value: 'dark', label: '深色' },
+    { value: 'cyberpunk', label: '赛博朋克' },
+    { value: 'journal', label: '手账涂鸦' },
+    { value: 'pixel', label: '像素比特' }
+  ]
 
   let colorPreviewIcon: HTMLElement
   let usernameValue: string = 'PC用户'
@@ -159,6 +168,19 @@
         </span>
       </div>
       <p class="help">{L.language_description()}</p>
+    </div>
+
+    <div class="field">
+      <label class="label" for="skin">皮肤主题</label>
+      <div class="control">
+        <div class="select">
+          <select bind:value={$theme} id="skin">
+            {#each skinOptions as opt}
+              <option value={opt.value}>{opt.label}</option>
+            {/each}
+          </select>
+        </div>
+      </div>
     </div>
 
     <h2>{L.media()}</h2>

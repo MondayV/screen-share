@@ -1,0 +1,10 @@
+[data-theme="cyberpunk"] {
+  --bg: #0d0221;
+  --bg-secondary: #0f0a2e;
+  --text: #ff2a6d;
+  --text-secondary: #05d9e8;
+  --primary: #ff2a6d;
+  --primary-text: #0d0221;
+  --border: #05d9e8;
+  --accent: #01cdfe;
+}

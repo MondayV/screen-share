@@ -1,0 +1,10 @@
+[data-theme="dark"] {
+  --bg: #1a1a2e;
+  --bg-secondary: #16213e;
+  --text: #e0e0e0;
+  --text-secondary: #a0a0a0;
+  --primary: #7c5cff;
+  --primary-text: #ffffff;
+  --border: #2a2a4a;
+  --accent: #00e5ff;
+}

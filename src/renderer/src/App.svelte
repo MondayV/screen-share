@@ -1,4 +1,9 @@
 <script lang="ts">
+  import './styles/themes/default.css'
+  import './styles/themes/dark.css'
+  import './styles/themes/cyberpunk.css'
+  import './styles/themes/journal.css'
+  import './styles/themes/pixel.css'
   import Navigation from './Navigation.svelte'
   import Join from './Join.svelte'
   import Host from './Host.svelte'
@@ -12,8 +17,10 @@
     useParticipantUrl,
     useHostUrl
   } from './stores'
+  import { theme } from './theme'
   import { getDataFromPcConnectUrl } from './Utils'
   const activeView = useActiveView()
+  theme // keep reference so subscription runs
   const participantUrl = useParticipantUrl()
   const hostUrl = useHostUrl()
   const isHosting = useIsHosting()

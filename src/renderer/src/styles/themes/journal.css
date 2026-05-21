@@ -1,0 +1,10 @@
+[data-theme="journal"] {
+  --bg: #fef9e7;
+  --bg-secondary: #fdebd0;
+  --text: #5d4037;
+  --text-secondary: #8d6e63;
+  --primary: #d35400;
+  --primary-text: #ffffff;
+  --border: #bcaaa4;
+  --accent: #27ae60;
+}

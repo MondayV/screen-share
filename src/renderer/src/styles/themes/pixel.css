@@ -1,0 +1,11 @@
+[data-theme="pixel"] {
+  --bg: #c0c0c0;
+  --bg-secondary: #a0a0a0;
+  --text: #000080;
+  --text-secondary: #0000a0;
+  --primary: #ff00ff;
+  --primary-text: #ffffff;
+  --border: #808080;
+  --accent: #00ff00;
+  font-family: 'Courier New', monospace;
+}
