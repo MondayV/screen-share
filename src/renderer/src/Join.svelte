@@ -77,6 +77,19 @@
     Swal.fire({ position: 'top-end', icon: 'info', title: '连接已断开', showConfirmButton: false, timer: 1500 })
   }
 
+  const resetView = (): void => {
+    if (hls) { hls.destroy(); hls = null }
+    remoteScreen.src = ''
+    remoteScreen.load()
+    playUrl = ''
+    isStreaming = false
+    joinAttempting = false
+    errorShown = false
+    $navigationEnabled = true
+    $isWatching = false
+    Swal.close()
+  }
+
   const onFullscreenClick = (): void => remoteScreen.requestFullscreen()
   const onZoomInClick = (): void => { zoomFactor += 0.1; remoteScreen.style.scale = zoomFactor.toString() }
   const onZoomOutClick = (): void => {
@@ -92,7 +105,12 @@
   {#if isStreaming}
     <div class="fixed-grid">
       <div class="grid">
-        <div class="cell"></div>
+        <div class="cell">
+          <button class="button is-light" on:click={resetView}>
+            <span class="icon"><i class="fas fa-arrow-left"></i></span>
+            <span>返回</span>
+          </button>
+        </div>
         <div class="cell has-text-right">
           <button class="button is-danger" on:click={onDisconnectClick}>
             <span class="icon"><i class="fas fa-unlink"></i></span>
@@ -100,6 +118,17 @@
           </button>
         </div>
       </div>
+    </div>
+  {:else if joinAttempting}
+    <div class="has-text-centered">
+      <p class="is-size-5 mb-3">正在连接...</p>
+      <progress class="progress is-small is-primary" max="100" style="width: 200px; margin: 0 auto;"></progress>
+      <p class="mt-4">
+        <button class="button is-light" on:click={resetView}>
+          <span class="icon"><i class="fas fa-arrow-left"></i></span>
+          <span>返回</span>
+        </button>
+      </p>
     </div>
   {:else}
     <div class="has-text-centered">

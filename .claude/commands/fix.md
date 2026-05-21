@@ -1,85 +1,71 @@
-# 指令：观众端增加“等待主持人推流”状态提示
+# 指令：观众端失败后无法退出连接状态
 
 ## 问题
-观众端目前无法知晓主持人是否已开始推流，只能反复尝试加载，体验较差。
+观众输入链接点击观看后，若主持人未推流或流密钥错误，索引文件返回 404，但界面没有提供取消或返回按钮，用户无法退出播放状态重新输入链接，只能重启应用。
 
-## 目标
-- 观众输入播放链接点击“观看”后，先检查流是否可用。
-- 若主持人尚未推流（索引文件返回 404），则显示“正在等待主持人推流…”并自动重试，不弹出错误。
-- 一旦检测到流可用，自动进入正常播放状态。
-- 避免用户看到循环错误弹窗，同时清楚告知当前状态。
+## 修复目标
+- 在等待/播放/错误状态下，增加“返回”按钮，允许用户中断并回到初始输入界面。
+- 点击返回时，彻底清理定时器、HLS 实例，重置所有状态变量。
+- 当发生致命错误时，自动停止等待并显示错误提示，同时提供返回按钮。
 
 ## 修改文件
-- `src/renderer/src/Join.svelte`（观众端组件）
+- `src/renderer/src/Join.svelte`
 
 ## 修改内容
 
-### 1. 添加状态变量
-在 `<script>` 中增加：
-```ts
-let streamStatus = 'idle'; // 'idle' | 'waiting' | 'playing' | 'error'
-let retryTimer: ReturnType<typeof setTimeout> | null = null;
-2. 实现流检测函数
-ts
-async function checkStreamAvailable(url: string): Promise<boolean> {
-  try {
-    const response = await fetch(url, { method: 'HEAD' });
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
+### 1. 增加“返回”按钮
+在模板中，当 `streamStatus` 不为 `'idle'` 时显示返回按钮，放置在播放器区域或底部。
+```html
+{#if streamStatus !== 'idle'}
+  <button on:click={resetView}>← 返回</button>
+{/if}
+按钮样式可使用现有皮肤变量，保持简洁。
 
-async function waitForStream(url: string) {
-  streamStatus = 'waiting';
-  const available = await checkStreamAvailable(url);
-  if (available) {
-    startPlayback(url); // 原有播放函数
-    streamStatus = 'playing';
-  } else {
-    // 5 秒后重试
-    retryTimer = setTimeout(() => waitForStream(url), 5000);
-  }
-}
-3. 修改“观看”按钮点击逻辑
-在原来的 watch() 函数中，先停止之前的重试，再调用 waitForStream：
-
+2. 实现重置函数 resetView
 ts
-function watch() {
-  if (!playUrl || !videoElement) return;
-  if (retryTimer) clearTimeout(retryTimer);
+function resetView() {
+  // 清除重试定时器
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+  // 销毁 HLS 播放器
+  if (hls) {
+    hls.destroy();
+    hls = null;
+  }
+  // 停止视频元素
+  if (videoElement) {
+    videoElement.pause();
+    videoElement.src = '';
+    videoElement.load();
+  }
+  // 重置状态
+  streamStatus = 'idle';
+  playUrl = '';
   errorShown = false;
-  waitForStream(playUrl);
+  notification = '';
 }
-4. UI 状态显示
-在模板中根据 streamStatus 显示不同提示：
+3. 在发生致命错误时调用重置
+修改 Hls.Events.ERROR 监听器，在 data.fatal 为真时，可以显示错误并调用 resetView，或保持显示错误提示并让用户手动点击返回。推荐显示错误通知，同时显示返回按钮。
 
-waiting：显示“正在等待主持人推流…（自动重试中）”
-
-playing：显示正常播放画面（原有逻辑）
-
-error：显示错误提示（原有逻辑）
-
-idle：初始状态
-
-可使用简单的文字或图标，保持皮肤风格。
-
-5. 清理定时器
-在组件销毁时清除重试定时器：
-
+4. 在 onDestroy 中确保清理
 ts
-import { onDestroy } from 'svelte';
 onDestroy(() => {
-  if (retryTimer) clearTimeout(retryTimer);
-  if (hls) { hls.destroy(); hls = null; }
+  resetView(); // 或直接清理定时器和 HLS
 });
-验收标准
-观众输入链接点击“观看”，若主持人未推流，界面显示“正在等待主持人推流…”。
+5. 调整 UI 状态显示
+idle：输入框 + “观看”按钮
 
-观众无需手动重试，应用每 5 秒自动检测一次。
+waiting：等待提示 + 返回按钮
 
-主持人开始推流后，检测到流可用，自动进入播放状态。
+playing：视频播放 + 返回按钮
 
-整个过程无错误弹窗。
+error：错误信息 + 返回按钮
 
-若主持人已推流，加载过程平滑，不显示等待状态。
+验证
+观众输入无效链接或主持人未推流，点击观看 → 显示等待/错误，可点击返回重新输入。
+
+播放中点击返回，视频停止，回到初始界面。
+
+返回后再次输入正确的链接，能正常播放
