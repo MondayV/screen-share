@@ -1,72 +1,72 @@
 /* Apply theme variables to base elements and Bulma overrides */
-[data-theme] body {
+[data-theme]:not([data-theme="default"]) body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-ui);
   transition: background-color var(--transition-speed), color var(--transition-speed);
 }
 
-[data-theme] .box,
-[data-theme] .card {
+[data-theme]:not([data-theme="default"]) .box,
+[data-theme]:not([data-theme="default"]) .card {
   background-color: var(--card-bg, var(--bg-secondary));
   color: var(--text-primary);
   border-color: var(--border-color);
   box-shadow: var(--shadow);
 }
 
-[data-theme] .title,
-[data-theme] .label,
-[data-theme] .heading {
+[data-theme]:not([data-theme="default"]) .title,
+[data-theme]:not([data-theme="default"]) .label,
+[data-theme]:not([data-theme="default"]) .heading {
   color: var(--text-primary);
 }
 
-[data-theme] .has-text-grey,
-[data-theme] .help {
+[data-theme]:not([data-theme="default"]) .has-text-grey,
+[data-theme]:not([data-theme="default"]) .help {
   color: var(--text-secondary) !important;
 }
 
-[data-theme] .button {
+[data-theme]:not([data-theme="default"]) .button {
   border-radius: var(--button-radius);
   transition: all var(--transition-speed);
 }
 
-[data-theme] .button.is-link,
-[data-theme] .button.is-primary {
+[data-theme]:not([data-theme="default"]) .button.is-link,
+[data-theme]:not([data-theme="default"]) .button.is-primary {
   background-color: var(--accent-secondary);
   border-color: var(--accent-secondary);
   box-shadow: var(--shadow);
 }
 
-[data-theme] .button.is-link:hover,
-[data-theme] .button.is-primary:hover {
+[data-theme]:not([data-theme="default"]) .button.is-link:hover,
+[data-theme]:not([data-theme="default"]) .button.is-primary:hover {
   background-color: var(--accent-primary);
   border-color: var(--accent-primary);
 }
 
-[data-theme] .button.is-info {
+[data-theme]:not([data-theme="default"]) .button.is-info {
   background-color: var(--accent-primary);
   border-color: var(--accent-primary);
 }
 
-[data-theme] .button.is-success {
+[data-theme]:not([data-theme="default"]) .button.is-success {
   background-color: var(--accent-primary);
   border-color: var(--accent-primary);
 }
 
-[data-theme] .button.is-danger {
+[data-theme]:not([data-theme="default"]) .button.is-danger {
   background-color: var(--accent-secondary);
 }
-[data-theme] .button.is-light {
+[data-theme]:not([data-theme="default"]) .button.is-light {
   background-color: var(--bg-secondary);
   color: var(--text-primary);
 }
 
-[data-theme] input,
-[data-theme] .input,
-[data-theme] select,
-[data-theme] .select select,
-[data-theme] textarea,
-[data-theme] .textarea {
+[data-theme]:not([data-theme="default"]) input,
+[data-theme]:not([data-theme="default"]) .input,
+[data-theme]:not([data-theme="default"]) select,
+[data-theme]:not([data-theme="default"]) .select select,
+[data-theme]:not([data-theme="default"]) textarea,
+[data-theme]:not([data-theme="default"]) .textarea {
   background-color: var(--input-bg);
   color: var(--text-primary);
   border-color: var(--border-color);
@@ -74,14 +74,14 @@
   font-family: var(--font-ui);
 }
 
-[data-theme] input:focus,
-[data-theme] .input:focus {
+[data-theme]:not([data-theme="default"]) input:focus,
+[data-theme]:not([data-theme="default"]) .input:focus {
   box-shadow: var(--input-focus-shadow);
 }
 
-[data-theme] input::placeholder {
+[data-theme]:not([data-theme="default"]) input::placeholder {
   color: var(--text-secondary);
 }
 
-[data-theme] ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); }
-[data-theme] ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+[data-theme]:not([data-theme="default"]) ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); }
+[data-theme]:not([data-theme="default"]) ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
