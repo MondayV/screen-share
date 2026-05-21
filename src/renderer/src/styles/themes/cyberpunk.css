@@ -1,313 +1,269 @@
 /* ============================================================
-   PCConnect · Cyberpunk 未来终端皮肤
-   电子线路背景 + 呼吸灯光 + 全息玻璃 + 故障特效
+   PCConnect · Cyberpunk Holographic Terminal
+   全息影像终端 — 悬浮光效 + 多层玻璃 + 数据粒子
    ============================================================ */
 
 [data-theme="cyberpunk"] {
-  /* ----- 调色板 ----- */
-  --bg-primary: #020812;
-  --bg-secondary: #0a1320;
-  --text-primary: #c0f0cc;
-  --text-secondary: #80b0aa;
-  --accent-primary: #00ff41;
-  --accent-secondary: #ff007f;
-  --accent-tertiary: #f0ff00;
-  --border-color: rgba(0, 255, 65, 0.3);
-  --shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+  --bg-primary: #040a18;
+  --bg-secondary: #0a1430;
+  --text-primary: #d0e8ff;
+  --text-secondary: #80b0d0;
+  --accent-primary: #00d4ff;
+  --accent-secondary: #c050ff;
+  --accent-tertiary: #fff0a0;
+  --border-color: rgba(0, 180, 255, 0.25);
+  --shadow: 0 4px 30px rgba(0, 180, 255, 0.15);
   --font-ui: 'Orbitron', sans-serif;
   --font-mono: 'Share Tech Mono', monospace;
-  --transition-speed: 0.2s;
-  --button-radius: 2px;
-  --card-bg: rgba(10, 15, 30, 0.6);
-  --input-bg: #0a1320;
-  --input-focus-shadow: 0 0 20px rgba(0, 255, 65, 0.8);
-  --scrollbar-thumb: #00ff41;
-  --scrollbar-track: #0a1320;
+  --transition-speed: 0.25s;
+  --button-radius: 3px;
+  --card-bg: rgba(10, 20, 50, 0.55);
+  --input-bg: rgba(4, 10, 30, 0.7);
+  --input-focus-shadow: 0 0 30px rgba(0, 200, 255, 0.5);
+  --scrollbar-thumb: rgba(0, 200, 255, 0.5);
+  --scrollbar-track: rgba(10, 20, 50, 0.5);
 }
 
-/* ===== 全局背景：暗色基底 + 电子线路纹理 ===== */
+/* ============================================================
+   GLOBAL BACKGROUND: Deep space + holographic particle field
+   ============================================================ */
 [data-theme="cyberpunk"] html {
   background: var(--bg-primary);
 }
+
 [data-theme="cyberpunk"] body {
-  margin: 0; padding: 0;
-  min-height: 100vh;
+  margin: 0; padding: 0; min-height: 100vh;
   background:
-    /* 第一层：水平扫描线 */
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0, 255, 65, 0.02) 2px,
-      rgba(0, 255, 65, 0.02) 4px
-    ),
-    /* 第二层：垂直光缆 */
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 60px,
-      rgba(0, 255, 65, 0.05) 60px,
-      rgba(0, 255, 65, 0.05) 62px
-    ),
-    /* 第三层：水平光缆 */
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 60px,
-      rgba(0, 255, 65, 0.05) 60px,
-      rgba(0, 255, 65, 0.05) 62px
-    ),
-    /* 第四层：芯片网格 */
-    repeating-linear-gradient(
-      45deg,
-      transparent,
-      transparent 12px,
-      rgba(0, 255, 65, 0.03) 12px,
-      rgba(0, 255, 65, 0.03) 14px
-    ),
+    /* 深度雾层 */
+    radial-gradient(ellipse at 20% 20%, rgba(0, 180, 255, 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 60%, rgba(180, 50, 255, 0.05) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(0, 220, 255, 0.04) 0%, transparent 55%),
+    /* 六角全息网格 */
+    repeating-linear-gradient(60deg,  rgba(0, 180, 255, 0.02) 0px, transparent 1px, transparent 40px, rgba(0, 180, 255, 0.03) 41px),
+    repeating-linear-gradient(120deg, rgba(0, 180, 255, 0.02) 0px, transparent 1px, transparent 40px, rgba(0, 180, 255, 0.03) 41px),
     var(--bg-primary);
   background-attachment: fixed;
 }
 
-/* 确保所有页面容器透明，让 body 背景穿透 */
-[data-theme="cyberpunk"] #app,
-[data-theme="cyberpunk"] .container,
-[data-theme="cyberpunk"] .container.p-5,
-[data-theme="cyberpunk"] main,
-[data-theme="cyberpunk"] section {
-  background: transparent !important;
-}
-
-/* 呼吸灯光节点（随机分布） */
+/* Floating light particles */
 [data-theme="cyberpunk"] body::before {
   content: "";
-  position: fixed;
-  top: 0; left: 0; width: 100%; height: 100%;
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
   background:
-    radial-gradient(circle at 20% 30%, rgba(0,255,65,0.15) 0%, transparent 8%),
-    radial-gradient(circle at 80% 70%, rgba(255,0,127,0.1) 0%, transparent 10%),
-    radial-gradient(circle at 50% 50%, rgba(0,255,65,0.1) 0%, transparent 12%),
-    radial-gradient(circle at 10% 80%, rgba(240,255,0,0.08) 0%, transparent 6%),
-    radial-gradient(circle at 90% 20%, rgba(0,255,65,0.12) 0%, transparent 10%),
-    radial-gradient(circle at 40% 10%, rgba(0,255,65,0.1) 0%, transparent 8%),
-    radial-gradient(circle at 70% 40%, rgba(255,0,127,0.08) 0%, transparent 12%);
-  pointer-events: none;
-  z-index: 0;
-  animation: breathing 4s ease-in-out infinite alternate;
+    radial-gradient(1px 1px at 15% 25%, rgba(180, 220, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 75% 40%, rgba(220, 200, 255, 0.6), transparent),
+    radial-gradient(1.5px 1.5px at 35% 65%, rgba(120, 220, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 85% 80%, rgba(200, 160, 255, 0.5), transparent),
+    radial-gradient(1.5px 1.5px at 55% 15%, rgba(140, 200, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 10% 75%, rgba(200, 220, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 65% 55%, rgba(160, 200, 255, 0.7), transparent),
+    radial-gradient(1.5px 1.5px at 45% 85%, rgba(140, 180, 255, 0.5), transparent),
+    radial-gradient(2px 2px at 25% 10%, rgba(200, 220, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 92% 30%, rgba(180, 200, 255, 0.7), transparent);
+  pointer-events: none; z-index: 0;
+  animation: particlesFade 6s ease-in-out infinite alternate;
 }
 
-/* 确保应用内容在背景之上，同时保持透明 */
+/* Holographic scan line */
+[data-theme="cyberpunk"] body::after {
+  content: "";
+  position: fixed; top: 0; left: 0; width: 100%; height: 3px;
+  background: linear-gradient(90deg, transparent, rgba(0, 220, 255, 0.15), transparent);
+  z-index: 4; pointer-events: none;
+  animation: scanDown 4s linear infinite;
+}
+
+/* Content layer */
 [data-theme="cyberpunk"] #app,
 [data-theme="cyberpunk"] .app-container,
-[data-theme="cyberpunk"] main {
+[data-theme="cyberpunk"] main,
+[data-theme="cyberpunk"] .container,
+[data-theme="cyberpunk"] .container.p-5,
+[data-theme="cyberpunk"] section {
   position: relative; z-index: 1;
   background: transparent !important;
 }
 
-/* ===== 按钮：全息光边 + 扫描光条 ===== */
+/* ============================================================
+   CARDS / BOXES / PANELS: Holographic frosted glass
+   ============================================================ */
+[data-theme="cyberpunk"] .box,
+[data-theme="cyberpunk"] .card,
+[data-theme="cyberpunk"] .modal-content,
+[data-theme="cyberpunk"] .swal2-popup,
+[data-theme="cyberpunk"] dialog,
+[data-theme="cyberpunk"] [role="dialog"] {
+  background: var(--card-bg) !important;
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow:
+    0 8px 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+}
+
+/* Light reflection edge on cards */
+[data-theme="cyberpunk"] .box::before {
+  content: "";
+  position: absolute; top: 0; left: 20px; right: 20px; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(180, 220, 255, 0.3), transparent);
+  pointer-events: none;
+}
+
+/* ============================================================
+   BUTTONS: Illuminated glass with hover bloom
+   ============================================================ */
 [data-theme="cyberpunk"] button,
 [data-theme="cyberpunk"] .button {
-  position: relative;
-  overflow: hidden;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  font-weight: bold;
-  border: 2px solid var(--border-color);
-  background: rgba(0, 255, 65, 0.05);
-  box-shadow: 0 0 10px rgba(0, 255, 65, 0.2);
-  transition: all 0.3s;
+  position: relative; overflow: hidden;
+  text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700;
+  border: 1px solid rgba(180, 200, 255, 0.2) !important;
+  background: rgba(15, 30, 60, 0.6) !important;
+  backdrop-filter: blur(8px);
+  color: var(--text-primary) !important;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  transition: all var(--transition-speed);
   cursor: pointer;
-}
-[data-theme="cyberpunk"] button::after,
-[data-theme="cyberpunk"] .button::after {
-  content: "";
-  position: absolute;
-  top: 0; left: -100%;
-  width: 100%; height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(0,255,65,0.4), transparent);
-  transition: left 0.6s;
-}
-[data-theme="cyberpunk"] button:hover::after,
-[data-theme="cyberpunk"] .button:hover::after {
-  left: 100%;
 }
 [data-theme="cyberpunk"] button:hover,
 [data-theme="cyberpunk"] .button:hover {
-  border-color: var(--accent-primary) !important;
-  box-shadow: 0 0 40px var(--accent-primary), 0 0 15px var(--accent-secondary);
-  color: var(--accent-tertiary) !important;
-  background: rgba(0,255,65,0.15) !important;
+  border-color: rgba(0, 200, 255, 0.6) !important;
+  background: rgba(20, 50, 100, 0.7) !important;
+  box-shadow:
+    0 0 30px rgba(0, 180, 255, 0.3),
+    0 0 60px rgba(0, 140, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  color: #fff !important;
+  transform: translateY(-1px);
+}
+[data-theme="cyberpunk"] button:active,
+[data-theme="cyberpunk"] .button:active {
+  transform: translateY(0);
+  box-shadow: 0 0 15px rgba(0, 180, 255, 0.2);
 }
 
-/* ===== 输入框：底部霓虹条 + 聚焦光晕 ===== */
+/* Primary action glow */
+[data-theme="cyberpunk"] .button.is-link,
+[data-theme="cyberpunk"] .button.is-primary {
+  background: rgba(0, 140, 220, 0.3) !important;
+  border-color: rgba(0, 200, 255, 0.4) !important;
+  box-shadow: 0 0 25px rgba(0, 180, 255, 0.2);
+}
+
+/* Danger / stop */
+[data-theme="cyberpunk"] .button.is-danger {
+  background: rgba(200, 50, 80, 0.3) !important;
+  border-color: rgba(255, 100, 130, 0.4) !important;
+}
+[data-theme="cyberpunk"] .button.is-danger:hover {
+  box-shadow: 0 0 30px rgba(255, 80, 100, 0.3);
+}
+
+/* ============================================================
+   INPUTS: Glass input with holographic focus bloom
+   ============================================================ */
 [data-theme="cyberpunk"] input,
+[data-theme="cyberpunk"] .input,
 [data-theme="cyberpunk"] select,
-[data-theme="cyberpunk"] textarea {
-  background: var(--input-bg);
-  border: none;
-  border-bottom: 2px solid var(--border-color);
-  color: var(--text-primary);
-  padding: 8px 12px;
-  transition: border-color 0.3s, box-shadow 0.3s;
-  outline: none;
+[data-theme="cyberpunk"] .select select,
+[data-theme="cyberpunk"] textarea,
+[data-theme="cyberpunk"] .textarea {
+  background: var(--input-bg) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color) !important;
+  border-radius: 4px;
+  color: var(--text-primary) !important;
+  padding: 10px 14px;
+  font-family: var(--font-ui);
+  transition: all var(--transition-speed);
 }
 [data-theme="cyberpunk"] input:focus,
+[data-theme="cyberpunk"] .input:focus,
 [data-theme="cyberpunk"] select:focus,
 [data-theme="cyberpunk"] textarea:focus {
-  border-bottom-color: var(--accent-primary);
-  box-shadow: 0 12px 24px -12px rgba(0, 255, 65, 0.6);
+  outline: none;
+  border-color: rgba(0, 220, 255, 0.7) !important;
+  box-shadow:
+    0 0 0 3px rgba(0, 180, 255, 0.12),
+    0 0 40px rgba(0, 200, 255, 0.15);
+}
+[data-theme="cyberpunk"] input::placeholder {
+  color: rgba(180, 200, 220, 0.35);
 }
 
-/* ===== Box / Container 面板统一 ===== */
-[data-theme="cyberpunk"] .box {
-  background: var(--card-bg) !important;
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  box-shadow: var(--shadow);
+/* ============================================================
+   TITLES: Holographic glow text
+   ============================================================ */
+[data-theme="cyberpunk"] h1,
+[data-theme="cyberpunk"] .title {
+  font-weight: 300; letter-spacing: 3px;
+  text-shadow:
+    0 0 30px rgba(0, 200, 255, 0.3),
+    0 0 60px rgba(0, 140, 255, 0.1);
+  color: #e0f0ff;
 }
-[data-theme="cyberpunk"] .container {
-  color: var(--text-primary);
+[data-theme="cyberpunk"] .heading {
+  color: rgba(180, 200, 220, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  font-size: 0.75rem;
 }
 
-/* ===== 导航栏 ===== */
+/* ============================================================
+   NAVIGATION: Glass bar
+   ============================================================ */
 [data-theme="cyberpunk"] nav,
 [data-theme="cyberpunk"] .navbar {
-  background: var(--bg-secondary);
+  background: rgba(8, 20, 45, 0.7) !important;
+  backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border-color);
 }
 [data-theme="cyberpunk"] .navbar-item {
   color: var(--text-secondary);
-  transition: color var(--transition-speed);
 }
 [data-theme="cyberpunk"] .navbar-item.is-active,
 [data-theme="cyberpunk"] .navbar-item:hover {
   color: var(--accent-primary) !important;
-  background: transparent;
+  background: rgba(0, 180, 255, 0.08) !important;
 }
 
-/* ===== 进度条 ===== */
-[data-theme="cyberpunk"] progress {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-}
-[data-theme="cyberpunk"] progress::-webkit-progress-value {
-  background: var(--accent-primary);
-}
-[data-theme="cyberpunk"] progress::-moz-progress-bar {
-  background: var(--accent-primary);
-}
-
-/* ===== 链接 / 图标 ===== */
-[data-theme="cyberpunk"] a {
-  color: var(--accent-primary);
-  transition: color var(--transition-speed);
-}
-[data-theme="cyberpunk"] a:hover {
-  color: var(--accent-tertiary);
-}
-[data-theme="cyberpunk"] .icon i {
-  color: inherit;
-}
-
-/* ===== 等宽字体文本 ===== */
+/* ============================================================
+   MISC ELEMENTS
+   ============================================================ */
 [data-theme="cyberpunk"] .is-family-monospace {
-  color: var(--accent-primary);
+  color: rgba(0, 220, 255, 0.9);
+  text-shadow: 0 0 10px rgba(0, 200, 255, 0.2);
 }
+[data-theme="cyberpunk"] a { color: var(--accent-primary); }
+[data-theme="cyberpunk"] a:hover { color: var(--accent-tertiary); }
+[data-theme="cyberpunk"] hr { border-color: var(--border-color); }
+[data-theme="cyberpunk"] .has-text-grey,
+[data-theme="cyberpunk"] .help { color: var(--text-secondary) !important; }
+[data-theme="cyberpunk"] progress::-webkit-progress-value { background: var(--accent-primary); }
+[data-theme="cyberpunk"] progress::-moz-progress-bar { background: var(--accent-primary); }
+[data-theme="cyberpunk"] progress { background: rgba(10, 20, 50, 0.5); border: 1px solid var(--border-color); }
 
-/* ===== 分隔线 ===== */
-[data-theme="cyberpunk"] hr {
-  border-color: var(--border-color);
-}
-
-/* ===== 卡片 / 弹窗 / 设置面板：全息玻璃 ===== */
-[data-theme="cyberpunk"] .card,
-[data-theme="cyberpunk"] .modal-content,
-[data-theme="cyberpunk"] .settings-panel,
-[data-theme="cyberpunk"] dialog,
-[data-theme="cyberpunk"] [role="dialog"] {
-  background: rgba(5, 10, 25, 0.8);
-  backdrop-filter: blur(16px);
-  border: 1px solid transparent;
-  border-image: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary), var(--accent-tertiary)) 1;
-  box-shadow: 0 0 50px rgba(0, 255, 65, 0.25), inset 0 0 30px rgba(0, 255, 65, 0.05);
-  position: relative;
-  border-radius: 4px;
-}
-/* 内部扫描线 */
-[data-theme="cyberpunk"] .card::before,
-[data-theme="cyberpunk"] .modal-content::before,
-[data-theme="cyberpunk"] .settings-panel::before,
-[data-theme="cyberpunk"] dialog::before {
-  content: "";
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 255, 65, 0.03) 2px,
-    rgba(0, 255, 65, 0.03) 4px
-  );
-  pointer-events: none;
-  z-index: 1;
-}
-
-/* ===== 通知提示：霓虹边框 ===== */
-[data-theme="cyberpunk"] .notification,
-[data-theme="cyberpunk"] .alert {
-  border-left: 4px solid var(--accent-secondary);
-  background: rgba(255, 0, 127, 0.1);
-  box-shadow: 0 0 15px rgba(255, 0, 127, 0.3);
-}
-
-/* ===== 标题：故障特效 ===== */
-[data-theme="cyberpunk"] h1,
-[data-theme="cyberpunk"] h2 {
-  text-transform: uppercase;
-  text-shadow:
-    0 0 10px var(--accent-primary),
-    2px 2px 0 var(--accent-secondary),
-    -2px -2px 0 var(--accent-primary);
-  animation: glitchText 2.5s infinite;
-}
-
-/* ===== 滚动条 ===== */
-[data-theme="cyberpunk"] ::-webkit-scrollbar {
-  width: 6px;
-}
-[data-theme="cyberpunk"] ::-webkit-scrollbar-track {
-  background: var(--scrollbar-track);
-  box-shadow: inset 0 0 6px rgba(0,255,65,0.1);
-}
+/* ============================================================
+   SCROLLBAR: Neon-accented
+   ============================================================ */
+[data-theme="cyberpunk"] ::-webkit-scrollbar { width: 6px; }
+[data-theme="cyberpunk"] ::-webkit-scrollbar-track { background: rgba(10, 20, 50, 0.3); }
 [data-theme="cyberpunk"] ::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-  border-radius: 3px;
-  box-shadow: 0 0 12px var(--accent-primary);
+  background: var(--scrollbar-thumb); border-radius: 3px;
 }
 
-/* ===== 动画 ===== */
-@keyframes breathing {
-  0%   { opacity: 0.6; }
-  100% { opacity: 1; }
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@keyframes particlesFade {
+  0%   { opacity: 0.5; }
+  100% { opacity: 0.9; }
 }
-
-@keyframes glitchText {
-  0%, 100% {
-    text-shadow: 0 0 10px var(--accent-primary), 2px 2px 0 var(--accent-secondary), -2px -2px 0 var(--accent-primary);
-  }
-  15% {
-    text-shadow: -2px 2px 0 var(--accent-secondary), 2px -2px 0 var(--accent-primary);
-  }
-  30% {
-    text-shadow: 2px -2px 0 var(--accent-primary), -2px 2px 0 var(--accent-secondary);
-  }
-  45% {
-    text-shadow: -2px 0 0 var(--accent-secondary), 2px 0 0 var(--accent-primary);
-  }
-  60% {
-    text-shadow: 0 0 5px var(--accent-primary), 0 0 20px var(--accent-primary);
-  }
-  75% {
-    text-shadow: 0 0 10px var(--accent-secondary), 0 0 5px var(--accent-primary);
-  }
+@keyframes scanDown {
+  0%   { top: 0; }
+  100% { top: 100%; }
 }
