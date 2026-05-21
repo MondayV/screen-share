@@ -5,7 +5,7 @@
   import { theme } from './theme'
 
   const skinOptions = [
-    { value: 'dark', label: '深色' },
+    { value: 'default', label: '默认' },
     { value: 'cyberpunk', label: '赛博朋克' }
   ]
 

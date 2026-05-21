@@ -1,5 +1,4 @@
 <script lang="ts">
-  import './styles/themes/dark.css'
   import './styles/themes/cyberpunk.css'
   import './styles/theme-base.css'
   import Navigation from './Navigation.svelte'
