@@ -3,10 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <title>PC Connect</title>
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' https://*.trycloudflare.com; media-src 'self' blob: https://*.trycloudflare.com"
-    />
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline';
+      style-src 'self' 'unsafe-inline';
+      img-src 'self' data:;
+      font-src 'self';
+      connect-src 'self' ws: wss: https://*.workers.dev https://*.trycloudflare.com ws://localhost:4455 ws://127.0.0.1:4455;
+      media-src 'self' blob: https://*.trycloudflare.com;
+    ">
   </head>
 
   <body>

@@ -2,9 +2,14 @@ import OBSWebSocket from 'obs-websocket-js'
 
 let obs: OBSWebSocket | null = null
 
-export async function connectToOBS(password?: string): Promise<void> {
+function getOBSPassword(): string {
+  return localStorage.getItem('obs-websocket-password') || ''
+}
+
+export async function connectToOBS(): Promise<void> {
   obs = new OBSWebSocket()
-  await obs.connect('ws://localhost:4455', password || '')
+  const password = getOBSPassword()
+  await obs.connect('ws://localhost:4455', password)
 }
 
 export async function getStreamStatus(): Promise<boolean> {

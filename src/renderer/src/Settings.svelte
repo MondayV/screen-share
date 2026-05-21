@@ -15,11 +15,13 @@
   let modalSuccessIsActive = false
   let modalFailureIsActive = false
   let isMicrophoneEnabledOnConnect = true
+  let obsPassword = ''
 
   $: colorValue, checkColor()
   $: usernameValue, checkUsername()
   $: iceServersValue, checkIceServers()
   $: isMicrophoneEnabledOnConnect
+  $: obsPassword, saveOBSPassword()
 
   const checkIceServers = (): void => {
     const serversObjects = iceServersValue.split('\n')
@@ -71,6 +73,10 @@
       }, 2000)
     }
   }
+  function saveOBSPassword(): void {
+    localStorage.setItem('obs-websocket-password', obsPassword.trim())
+  }
+
   onMount(async () => {
     const settings = await window.PcConnectApi.getSettings()
     usernameValue = settings.username
@@ -78,6 +84,7 @@
     language = settings.language
     isMicrophoneEnabledOnConnect = settings.isMicrophoneEnabledOnConnect
     iceServersValue = settings.iceServers.map((srv) => JSON.stringify(srv)).join('\n')
+    obsPassword = localStorage.getItem('obs-websocket-password') || ''
   })
 </script>
 
@@ -168,6 +175,21 @@
           {L.is_microphone_active_on_connect()}
         </label>
       </div>
+    </div>
+
+    <h2>OBS WebSocket</h2>
+    <div class="field">
+      <label class="label" for="obs-password">OBS WebSocket 密码</label>
+      <div class="control">
+        <input
+          class="input"
+          type="password"
+          id="obs-password"
+          bind:value={obsPassword}
+          placeholder="留空表示无密码"
+        />
+      </div>
+      <p class="help">在 OBS → 工具 → obs-websocket 设置 中查看</p>
     </div>
 
     <h2>{L.advanced()}</h2>

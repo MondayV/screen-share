@@ -1,71 +1,98 @@
-# 指令：观众端失败后无法退出连接状态
+# 指令：在设置面板中添加 OBS WebSocket 密码输入框
 
-## 问题
-观众输入链接点击观看后，若主持人未推流或流密钥错误，索引文件返回 404，但界面没有提供取消或返回按钮，用户无法退出播放状态重新输入链接，只能重启应用。
-
-## 修复目标
-- 在等待/播放/错误状态下，增加“返回”按钮，允许用户中断并回到初始输入界面。
-- 点击返回时，彻底清理定时器、HLS 实例，重置所有状态变量。
-- 当发生致命错误时，自动停止等待并显示错误提示，同时提供返回按钮。
+## 目标
+让用户可以在应用设置界面中输入 OBS WebSocket 连接密码，并持久化保存到 localStorage，避免硬编码密码在代码中。
 
 ## 修改文件
-- `src/renderer/src/Join.svelte`
+- `src/renderer/src/SettingsModal.svelte`（或实际的设置面板组件）
+- `src/renderer/src/lib/obs-controller.ts`（已存在）
 
-## 修改内容
+## 修改步骤
 
-### 1. 增加“返回”按钮
-在模板中，当 `streamStatus` 不为 `'idle'` 时显示返回按钮，放置在播放器区域或底部。
+### 1. 在设置面板中添加密码输入框
+找到设置面板组件，在合适位置（例如“OBS 连接设置”区域）添加以下 HTML：
+
 ```html
-{#if streamStatus !== 'idle'}
-  <button on:click={resetView}>← 返回</button>
-{/if}
-按钮样式可使用现有皮肤变量，保持简洁。
-
-2. 实现重置函数 resetView
+<div class="setting-item">
+  <label for="obs-password">OBS WebSocket 密码</label>
+  <input
+    type="password"
+    id="obs-password"
+    bind:value={obsWebSocketPassword}
+    placeholder="留空表示无密码"
+  />
+  <button on:click={saveOBSPassword}>保存</button>
+</div>
+2. 在组件的 <script> 中添加变量和方法
 ts
-function resetView() {
-  // 清除重试定时器
-  if (retryTimer) {
-    clearTimeout(retryTimer);
-    retryTimer = null;
+let obsWebSocketPassword = '';
+
+// 读取已保存的密码
+function loadOBSPassword() {
+  const saved = localStorage.getItem('obs-websocket-password');
+  if (saved) {
+    obsWebSocketPassword = saved;
   }
-  // 销毁 HLS 播放器
-  if (hls) {
-    hls.destroy();
-    hls = null;
-  }
-  // 停止视频元素
-  if (videoElement) {
-    videoElement.pause();
-    videoElement.src = '';
-    videoElement.load();
-  }
-  // 重置状态
-  streamStatus = 'idle';
-  playUrl = '';
-  errorShown = false;
-  notification = '';
 }
-3. 在发生致命错误时调用重置
-修改 Hls.Events.ERROR 监听器，在 data.fatal 为真时，可以显示错误并调用 resetView，或保持显示错误提示并让用户手动点击返回。推荐显示错误通知，同时显示返回按钮。
 
-4. 在 onDestroy 中确保清理
-ts
-onDestroy(() => {
-  resetView(); // 或直接清理定时器和 HLS
+// 保存密码到 localStorage
+function saveOBSPassword() {
+  localStorage.setItem('obs-websocket-password', obsWebSocketPassword.trim());
+  // 可选：提示保存成功
+}
+
+// 在 onMount 中加载
+import { onMount } from 'svelte';
+onMount(() => {
+  loadOBSPassword();
 });
-5. 调整 UI 状态显示
-idle：输入框 + “观看”按钮
+3. 更新 obs-controller.ts 使用 localStorage 密码
+在 src/renderer/src/lib/obs-controller.ts 中，修改 connectToOBS 函数获取密码的逻辑，确保从 localStorage 读取：
 
-waiting：等待提示 + 返回按钮
+ts
+function getOBSWebSocketPassword(): string {
+  return localStorage.getItem('obs-websocket-password') || '';
+}
 
-playing：视频播放 + 返回按钮
+export async function connectToOBS(): Promise<void> {
+  obs = new OBSWebSocket();
+  const password = getOBSWebSocketPassword();
+  try {
+    await obs.connect('ws://localhost:4455', password);
+    console.log('[OBS] 已连接');
+  } catch (err) {
+    console.error('[OBS] 连接失败:', err);
+    throw new Error('无法连接到 OBS，请确认 WebSocket 已启用且密码正确');
+  }
+}
+4. 确保密码字段样式与现有皮肤一致
+使用已有的 CSS 变量和类名，避免破坏 UI 风格。如：
 
-error：错误信息 + 返回按钮
+css
+.setting-item {
+  margin: 8px 0;
+}
+.setting-item label {
+  display: block;
+  font-size: 14px;
+}
+.setting-item input {
+  width: 100%;
+  padding: 6px;
+  margin: 4px 0;
+}
+5. 重新构建并测试
+清理：rm -rf release out
 
-验证
-观众输入无效链接或主持人未推流，点击观看 → 显示等待/错误，可点击返回重新输入。
+构建：npm run build:win
 
-播放中点击返回，视频停止，回到初始界面。
+测试：打开应用 → 进入设置 → 输入 OBS WebSocket 密码 → 保存 → 开始共享，确认能正常连接 OBS。
 
-返回后再次输入正确的链接，能正常播放
+验收标准
+设置面板出现 OBS WebSocket 密码输入框
+
+密码保存到 localStorage，关闭应用再打开仍保留
+
+连接 OBS 时使用已保存的密码，无需用户每次输入
+
+样式与当前皮肤一致
