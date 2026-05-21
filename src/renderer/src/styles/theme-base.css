@@ -1,0 +1,78 @@
+/* Apply theme variables to base elements and Bulma overrides */
+[data-theme] body {
+  background-color: var(--bg);
+  color: var(--text);
+}
+
+[data-theme] .box,
+[data-theme] .card {
+  background-color: var(--bg-secondary);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+[data-theme] .title,
+[data-theme] .label,
+[data-theme] .heading {
+  color: var(--text);
+}
+
+[data-theme] .has-text-grey,
+[data-theme] .help {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme] .button.is-link,
+[data-theme] .button.is-primary {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-text);
+}
+
+[data-theme] .button.is-link:hover,
+[data-theme] .button.is-primary:hover {
+  background-color: var(--accent);
+  border-color: var(--accent);
+}
+
+[data-theme] .button.is-danger {
+  background-color: var(--text-secondary);
+  border-color: transparent;
+}
+
+[data-theme] .button.is-light {
+  background-color: var(--bg-secondary);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+[data-theme] .button.is-info {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+
+[data-theme] .button.is-success {
+  background-color: var(--accent);
+  border-color: var(--accent);
+}
+
+[data-theme] input,
+[data-theme] .input,
+[data-theme] select,
+[data-theme] .select select,
+[data-theme] textarea,
+[data-theme] .textarea {
+  background-color: var(--bg-secondary);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+[data-theme] input::placeholder {
+  color: var(--text-secondary);
+}
+
+[data-theme] .container {
+  background-color: var(--bg);
+  color: var(--text);
+}

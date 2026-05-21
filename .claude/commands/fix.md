@@ -1,107 +1,70 @@
-# 指令：优化 OBS 密码错误提示，增加快捷修改入口
+# 指令：修复皮肤切换后界面样式未改变
 
-## 目标
-- 当 OBS WebSocket 连接因密码错误失败时，提供友好的错误提示框，并包含一个“打开设置”按钮。
-- 点击按钮后自动打开设置面板，用户修改密码后可直接重试。
-- 保留现有的安全存储和设置页面逻辑。
+## 问题
+- 五款皮肤 CSS 文件已创建（`src/renderer/src/styles/themes/*.css`）
+- `theme.ts` store 已绑定 `<html data-theme="...">`
+- 切换皮肤时 `data-theme` 属性已变化，但界面样式未更新
 
-## 修改文件
-- `src/renderer/src/Host.svelte`
-- `src/renderer/src/SettingsModal.svelte`（如果存在独立的设置弹窗组件）
+## 排查与修复目标
+1. 确保每个主题 CSS 被引入到应用中（不是仅创建文件）。
+2. 确保所有 UI 组件使用 CSS 变量（`var(--xxx)`）而非硬编码颜色。
+3. 确保主题 CSS 的优先级高于默认样式。
 
-## 修改步骤
+## 修改步骤（AI 必须严格按顺序完成）
 
-### 1. 在 Host.svelte 中添加错误处理与设置弹窗控制
-在 `<script>` 中增加变量和方法：
+### 1. 确认主题 CSS 被全局引入
+- 检查 `src/renderer/src/main.ts` 或 `App.svelte` 或入口 HTML，是否导入了所有主题 CSS 文件。
+- 如果没有，添加以下导入：
+  ```ts
+  import './styles/themes/default.css';
+  import './styles/themes/dark.css';
+  import './styles/themes/cyberpunk.css';
+  import './styles/themes/journal.css';
+  import './styles/themes/pixel.css';
+确认导入路径正确（根据实际文件位置调整）。
 
-```ts
-import { connectToOBS, startStream, stopStream, disconnectOBS } from './lib/obs-controller';
-import SettingsModal from './SettingsModal.svelte'; // 路径根据实际调整
+如果使用 vite，也可以通过在 index.html 中使用 <link> 标签引入，但推荐在入口 TS 文件中导入。
 
-let showSettings = false;  // 控制设置弹窗显示
-let errorMessage = '';     // 错误消息
+2. 审查全局样式是否使用 CSS 变量
+打开 src/renderer/src/styles/global.css 或主要的全局样式文件。
 
-function openSettings() {
-  showSettings = true;
-}
-
-async function startShare() {
-  try {
-    errorMessage = '';
-    await connectToOBS();
-    // ... 原有启动逻辑
-  } catch (err) {
-    errorMessage = err.message || '启动失败';
-    // 如果是认证错误，提供快捷入口
-    if (errorMessage.includes('身份验证失败') || errorMessage.includes('密码错误')) {
-      // 将在 UI 中显示带按钮的错误提示
-    }
-    // 不自动弹出 alert，改为在界面上显示错误
-  }
-}
-2. 在模板中添加错误提示区域和设置弹窗
-在 Host 界面的合适位置（例如按钮下方），添加：
-
-svelte
-{#if errorMessage}
-  <div class="error-notification">
-    <span>{errorMessage}</span>
-    {#if errorMessage.includes('身份验证失败') || errorMessage.includes('密码错误')}
-      <button on:click={openSettings}>打开设置</button>
-    {/if}
-    <button on:click={() => errorMessage = ''}>关闭</button>
-  </div>
-{/if}
-
-<!-- 设置弹窗 -->
-{#if showSettings}
-  <SettingsModal on:close={() => showSettings = false} />
-{/if}
-3. 确保 SettingsModal 支持关闭事件
-如果 SettingsModal 尚未支持关闭事件，修改它，添加一个 close 事件调度：
-
-ts
-// 在 SettingsModal.svelte 的 script 中
-import { createEventDispatcher } from 'svelte';
-const dispatch = createEventDispatcher();
-
-function closeSettings() {
-  dispatch('close');
-}
-在设置面板的关闭按钮或背景点击时调用 closeSettings()。
-
-4. 调整样式
-为错误通知添加基础样式，可使用现有皮肤变量：
+将硬编码的颜色、背景、边框等替换为 var(--xxx) 形式，例如：
 
 css
-.error-notification {
-  background: var(--accent-secondary, #ff6b6b);
-  color: white;
-  padding: 10px;
-  border-radius: 4px;
-  margin: 10px 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+body {
+  background-color: var(--bg-primary, #fff);
+  color: var(--text-primary, #000);
 }
-.error-notification button {
-  background: white;
-  color: #333;
-  border: none;
-  padding: 4px 10px;
-  border-radius: 4px;
-  cursor: pointer;
+button {
+  background: var(--accent-primary, #00f);
+  border: 1px solid var(--border-color, #ccc);
 }
-5. 测试
-错误密码场景：输入错误密码保存，点击“开始共享”，应出现错误提示和“打开设置”按钮。
+至少替换全局基础元素（body, button, input, select, a, .card 等）。
 
-点击“打开设置”应弹出设置面板，修改密码保存后关闭面板，重新点击“开始共享”应连接成功。
+3. 修复 Svelte 组件中的硬编码样式
+搜索所有 .svelte 文件中的 <style> 块，如果包含硬编码颜色（如 color: #333），替换为 CSS 变量。
 
-正确密码场景：直接连接成功，不出现错误提示。
+特别注意 Host.svelte、Join.svelte、SettingsModal.svelte 等核心组件。
 
-验收标准
-密码错误时，不再仅是控制台报错，而是界面显示友好提示。
+4. 确保主题 CSS 文件使用 [data-theme="xxx"] 作用域
+打开每个主题 CSS 文件（如 dark.css），确认其内容格式为：
 
-用户可通过提示框中的按钮直接打开设置修改密码。
+css
+[data-theme="dark"] {
+  --bg-primary: #1a1a2e;
+  --text-primary: #e0e0e0;
+  /* ...其他变量 */
+}
+如果变量直接定义在 :root 中，改为上述作用域形式。
 
-设置面板可正常关闭，不阻塞主界面。
+5. 测试验证
+启动应用，切换皮肤，观察界面颜色是否即时变化。
+
+打开 DevTools → Elements，检查 <html> 的 data-theme 属性是否正确切换。
+
+检查任一元素的 computed styles，确认 CSS 变量是否生效。
+
+注意事项
+不要修改 theme.ts store 的逻辑，它本身没有问题。
+
+如果某些第三方组件（如 Font Awesome 图标）不受皮肤影响，可忽略。

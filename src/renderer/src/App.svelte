@@ -4,6 +4,7 @@
   import './styles/themes/cyberpunk.css'
   import './styles/themes/journal.css'
   import './styles/themes/pixel.css'
+  import './styles/theme-base.css'
   import Navigation from './Navigation.svelte'
   import Join from './Join.svelte'
   import Host from './Host.svelte'
