@@ -1,10 +1,19 @@
 [data-theme="dark"] {
-  --bg: #1a1a2e;
-  --bg-secondary: #16213e;
-  --text: #e0e0e0;
-  --text-secondary: #a0a0a0;
-  --primary: #7c5cff;
-  --primary-text: #ffffff;
-  --border: #2a2a4a;
-  --accent: #00e5ff;
+  --bg-primary: #1e1e2e;
+  --bg-secondary: #2a2a3a;
+  --text-primary: #e0e0ff;
+  --text-secondary: #a0a0cc;
+  --accent-primary: #7b68ee;
+  --accent-secondary: #ff6b9d;
+  --border-color: #3e3e5e;
+  --shadow: 0 2px 8px rgba(0,0,0,0.5);
+  --font-ui: 'Inter', sans-serif;
+  --font-mono: 'Fira Code', monospace;
+  --transition-speed: 0.2s;
+  --button-radius: 6px;
+  --card-bg: #2a2a3a;
+  --input-bg: #1e1e2e;
+  --input-focus-shadow: 0 0 0 2px rgba(123,104,238,0.4);
+  --scrollbar-thumb: #5a5a8a;
+  --scrollbar-track: #2a2a3a;
 }

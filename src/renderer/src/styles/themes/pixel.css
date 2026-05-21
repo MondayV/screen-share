@@ -1,11 +1,20 @@
 [data-theme="pixel"] {
-  --bg: #c0c0c0;
-  --bg-secondary: #a0a0a0;
-  --text: #000080;
-  --text-secondary: #0000a0;
-  --primary: #ff00ff;
-  --primary-text: #ffffff;
-  --border: #808080;
-  --accent: #00ff00;
-  font-family: 'Courier New', monospace;
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #2a2a3e;
+  --text-primary: #ffffff;
+  --text-secondary: #ccccff;
+  --accent-primary: #00d4ff;
+  --accent-secondary: #ff6b9d;
+  --border-color: #ffffff;
+  --shadow: 4px 4px 0 #000000;
+  --font-ui: 'Press Start 2P', cursive;
+  --font-mono: 'Silkscreen', monospace;
+  --transition-speed: 0s;
+  --button-radius: 0px;
+  --card-bg: #2a2a3e;
+  --input-bg: #1a1a2e;
+  --input-focus-shadow: 4px 4px 0 #00d4ff;
+  --scrollbar-thumb: #00d4ff;
+  --scrollbar-track: #1a1a2e;
+  image-rendering: pixelated;
 }

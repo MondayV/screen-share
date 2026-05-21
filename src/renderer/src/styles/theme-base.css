@@ -1,20 +1,23 @@
 /* Apply theme variables to base elements and Bulma overrides */
 [data-theme] body {
-  background-color: var(--bg);
-  color: var(--text);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  transition: background-color var(--transition-speed), color var(--transition-speed);
 }
 
 [data-theme] .box,
 [data-theme] .card {
-  background-color: var(--bg-secondary);
-  color: var(--text);
-  border-color: var(--border);
+  background-color: var(--card-bg, var(--bg-secondary));
+  color: var(--text-primary);
+  border-color: var(--border-color);
+  box-shadow: var(--shadow);
 }
 
 [data-theme] .title,
 [data-theme] .label,
 [data-theme] .heading {
-  color: var(--text);
+  color: var(--text-primary);
 }
 
 [data-theme] .has-text-grey,
@@ -22,39 +25,40 @@
   color: var(--text-secondary) !important;
 }
 
+[data-theme] .button {
+  border-radius: var(--button-radius);
+  transition: all var(--transition-speed);
+}
+
 [data-theme] .button.is-link,
 [data-theme] .button.is-primary {
-  background-color: var(--primary);
-  border-color: var(--primary);
-  color: var(--primary-text);
+  background-color: var(--accent-secondary);
+  border-color: var(--accent-secondary);
+  box-shadow: var(--shadow);
 }
 
 [data-theme] .button.is-link:hover,
 [data-theme] .button.is-primary:hover {
-  background-color: var(--accent);
-  border-color: var(--accent);
-}
-
-[data-theme] .button.is-danger {
-  background-color: var(--text-secondary);
-  border-color: transparent;
-}
-
-[data-theme] .button.is-light {
-  background-color: var(--bg-secondary);
-  color: var(--text);
-  border-color: var(--border);
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
 }
 
 [data-theme] .button.is-info {
-  background-color: var(--accent);
-  border-color: var(--accent);
-  color: var(--bg);
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
 }
 
 [data-theme] .button.is-success {
-  background-color: var(--accent);
-  border-color: var(--accent);
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+[data-theme] .button.is-danger {
+  background-color: var(--accent-secondary);
+}
+[data-theme] .button.is-light {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 [data-theme] input,
@@ -63,16 +67,21 @@
 [data-theme] .select select,
 [data-theme] textarea,
 [data-theme] .textarea {
-  background-color: var(--bg-secondary);
-  color: var(--text);
-  border-color: var(--border);
+  background-color: var(--input-bg);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+  border-radius: var(--button-radius);
+  font-family: var(--font-ui);
+}
+
+[data-theme] input:focus,
+[data-theme] .input:focus {
+  box-shadow: var(--input-focus-shadow);
 }
 
 [data-theme] input::placeholder {
   color: var(--text-secondary);
 }
 
-[data-theme] .container {
-  background-color: var(--bg);
-  color: var(--text);
-}
+[data-theme] ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); }
+[data-theme] ::-webkit-scrollbar-track { background: var(--scrollbar-track); }

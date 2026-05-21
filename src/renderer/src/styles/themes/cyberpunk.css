@@ -1,10 +1,21 @@
 [data-theme="cyberpunk"] {
-  --bg: #0d0221;
-  --bg-secondary: #0f0a2e;
-  --text: #ff2a6d;
-  --text-secondary: #05d9e8;
-  --primary: #ff2a6d;
-  --primary-text: #0d0221;
-  --border: #05d9e8;
-  --accent: #01cdfe;
+  --bg-primary: #0a0a1a;
+  --bg-secondary: #141428;
+  --text-primary: #e0e0ff;
+  --text-secondary: #b0b0dd;
+  --accent-primary: #00f0ff;
+  --accent-secondary: #ff007f;
+  --border-color: rgba(0, 240, 255, 0.3);
+  --shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+  --font-ui: 'Orbitron', sans-serif;
+  --font-mono: 'Share Tech Mono', monospace;
+  --transition-speed: 0.15s;
+  --button-radius: 2px;
+  --card-bg: rgba(10, 10, 26, 0.9);
+  --input-bg: #0a0a1a;
+  --input-focus-shadow: 0 0 10px rgba(0, 240, 255, 0.6);
+  --scrollbar-thumb: #00f0ff;
+  --scrollbar-track: #1a1a2e;
+  --neon-glow: 0 0 10px var(--accent-primary);
+  --neon-glow-secondary: 0 0 10px var(--accent-secondary);
 }

@@ -1,10 +1,19 @@
 [data-theme="journal"] {
-  --bg: #fef9e7;
-  --bg-secondary: #fdebd0;
-  --text: #5d4037;
-  --text-secondary: #8d6e63;
-  --primary: #d35400;
-  --primary-text: #ffffff;
-  --border: #bcaaa4;
-  --accent: #27ae60;
+  --bg-primary: #fff8e7;
+  --bg-secondary: #ffeacc;
+  --text-primary: #4a3b2f;
+  --text-secondary: #7a6b5f;
+  --accent-primary: #ff8c94;
+  --accent-secondary: #6bc9f2;
+  --border-color: #e8d5c4;
+  --shadow: 2px 2px 0 rgba(0,0,0,0.05);
+  --font-ui: 'Nunito', sans-serif;
+  --font-mono: 'Courier Prime', monospace;
+  --transition-speed: 0.2s;
+  --button-radius: 25px;
+  --card-bg: #ffffff;
+  --input-bg: #ffffff;
+  --input-focus-shadow: 0 0 0 2px #ff8c94;
+  --scrollbar-thumb: #ffb0b8;
+  --scrollbar-track: #fff0e0;
 }
