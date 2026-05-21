@@ -26,8 +26,12 @@
 }
 
 /* ===== 全局背景：暗色基底 + 电子线路纹理 ===== */
+[data-theme="cyberpunk"] html {
+  background: var(--bg-primary);
+}
 [data-theme="cyberpunk"] body {
-  margin: 0;
+  margin: 0; padding: 0;
+  min-height: 100vh;
   background:
     /* 第一层：水平扫描线 */
     repeating-linear-gradient(
@@ -63,9 +67,15 @@
     ),
     var(--bg-primary);
   background-attachment: fixed;
-  position: relative;
-  overflow-x: hidden;
-  overflow-y: auto;
+}
+
+/* 确保所有页面容器透明，让 body 背景穿透 */
+[data-theme="cyberpunk"] #app,
+[data-theme="cyberpunk"] .container,
+[data-theme="cyberpunk"] .container.p-5,
+[data-theme="cyberpunk"] main,
+[data-theme="cyberpunk"] section {
+  background: transparent !important;
 }
 
 /* 呼吸灯光节点（随机分布） */
@@ -86,12 +96,12 @@
   animation: breathing 4s ease-in-out infinite alternate;
 }
 
-/* 确保应用内容在背景之上 */
+/* 确保应用内容在背景之上，同时保持透明 */
 [data-theme="cyberpunk"] #app,
 [data-theme="cyberpunk"] .app-container,
 [data-theme="cyberpunk"] main {
-  position: relative;
-  z-index: 1;
+  position: relative; z-index: 1;
+  background: transparent !important;
 }
 
 /* ===== 按钮：全息光边 + 扫描光条 ===== */
