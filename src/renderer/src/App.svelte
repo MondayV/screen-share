@@ -43,6 +43,9 @@
 
 <Navigation />
 
+<div class="rain-container"></div>
+<div class="rain-layer-2"></div>
+
 {#if $activeView === 'join'}
   <Join />
 {:else if $activeView === 'host'}

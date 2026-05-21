@@ -1,21 +1,148 @@
+/* ========== 核心变量 ========== */
 [data-theme="cyberpunk"] {
-  --bg-primary: #0a0a1a;
-  --bg-secondary: #141428;
-  --text-primary: #e0e0ff;
-  --text-secondary: #b0b0dd;
+  --bg-primary: #010310;
+  --bg-secondary: #0a0f1e;
+  --text-primary: #c0f0ff;
+  --text-secondary: #80b0cc;
   --accent-primary: #00f0ff;
   --accent-secondary: #ff007f;
+  --accent-tertiary: #f0ff00;
   --border-color: rgba(0, 240, 255, 0.3);
-  --shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+  --shadow: 0 0 20px rgba(0, 240, 255, 0.4);
   --font-ui: 'Orbitron', sans-serif;
   --font-mono: 'Share Tech Mono', monospace;
-  --transition-speed: 0.15s;
+  --transition-speed: 0.2s;
   --button-radius: 2px;
-  --card-bg: rgba(10, 10, 26, 0.9);
-  --input-bg: #0a0a1a;
-  --input-focus-shadow: 0 0 10px rgba(0, 240, 255, 0.6);
+  --card-bg: rgba(5, 10, 25, 0.8);
+  --input-bg: #08081c;
+  --input-focus-shadow: 0 0 15px rgba(0, 240, 255, 0.8);
   --scrollbar-thumb: #00f0ff;
-  --scrollbar-track: #1a1a2e;
-  --neon-glow: 0 0 10px var(--accent-primary);
-  --neon-glow-secondary: 0 0 10px var(--accent-secondary);
+  --scrollbar-track: #0a0f1e;
+}
+
+/* ========== 代码雨背景 ========== */
+[data-theme="cyberpunk"] body {
+  position: relative;
+  background: var(--bg-primary);
+  overflow-x: hidden; overflow-y: auto;
+}
+
+[data-theme="cyberpunk"] .rain-layer-2,
+[data-theme="cyberpunk"] body::before {
+  content: "";
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 0;
+  background:
+    repeating-linear-gradient(90deg, rgba(0,240,255,0.02) 0px, transparent 1px, transparent 40px, rgba(0,240,255,0.02) 41px),
+    repeating-linear-gradient(0deg, rgba(0,240,255,0.02) 0px, transparent 1px, transparent 40px, rgba(0,240,255,0.02) 41px);
+  animation: gridMove 20s linear infinite;
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.7) 50%, rgba(0,0,0,0.3) 100%);
+}
+
+@keyframes gridMove {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(40px, 40px); }
+}
+
+/* 扫描线 */
+[data-theme="cyberpunk"] .rain-container,
+[data-theme="cyberpunk"] body::after {
+  content: "";
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,240,255,0.03) 2px, rgba(0,240,255,0.03) 4px);
+  pointer-events: none; z-index: 1;
+}
+
+/* 确保内容在效果层之上 */
+[data-theme="cyberpunk"] #app,
+[data-theme="cyberpunk"] .app-container {
+  position: relative; z-index: 2;
+}
+
+/* ========== 按钮：脉冲光环 + 扫描光条 ========== */
+[data-theme="cyberpunk"] button {
+  position: relative; overflow: hidden;
+  text-transform: uppercase; letter-spacing: 2px; font-weight: bold;
+  border: 2px solid var(--border-color);
+  background: linear-gradient(135deg, rgba(0,240,255,0.08), rgba(255,0,127,0.08));
+  box-shadow: 0 0 8px var(--accent-primary);
+  transition: all 0.2s; z-index: 1;
+}
+[data-theme="cyberpunk"] button::after {
+  content: ""; position: absolute; top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0,240,255,0.3), transparent);
+  transition: left 0.5s;
+}
+[data-theme="cyberpunk"] button:hover::after { left: 100%; }
+[data-theme="cyberpunk"] button:hover {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 25px var(--accent-primary), 0 0 10px var(--accent-secondary);
+  background: rgba(0,240,255,0.12);
+  color: var(--accent-tertiary);
+}
+
+/* ========== 输入框：全息下划线 ========== */
+[data-theme="cyberpunk"] input,
+[data-theme="cyberpunk"] select,
+[data-theme="cyberpunk"] textarea {
+  background: var(--input-bg);
+  border: none; border-bottom: 2px solid var(--border-color);
+  color: var(--text-primary); padding: 10px 12px;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+[data-theme="cyberpunk"] input:focus,
+[data-theme="cyberpunk"] select:focus,
+[data-theme="cyberpunk"] textarea:focus {
+  outline: none; border-bottom-color: var(--accent-primary);
+  box-shadow: 0 10px 20px -10px rgba(0, 240, 255, 0.5);
+}
+
+/* ========== 卡片 / 弹窗：全息玻璃 + 扫描线 ========== */
+[data-theme="cyberpunk"] .card,
+[data-theme="cyberpunk"] .box,
+[data-theme="cyberpunk"] .modal-content,
+[data-theme="cyberpunk"] .swal2-popup,
+[data-theme="cyberpunk"] dialog,
+[data-theme="cyberpunk"] [role="dialog"] {
+  background: var(--card-bg) !important;
+  backdrop-filter: blur(12px);
+  border: 1px solid transparent;
+  border-image: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)) 1;
+  box-shadow: 0 0 30px rgba(0,240,255,0.2), inset 0 0 20px rgba(0,240,255,0.05);
+  position: relative;
+}
+
+/* ========== 标题：故障效果 ========== */
+[data-theme="cyberpunk"] h1, [data-theme="cyberpunk"] .title {
+  text-shadow: 0 0 5px #0ff, 0 0 15px #0ff, 2px 2px 0 #f0f, -2px -2px 0 #0ff;
+  animation: glitch 3s infinite;
+}
+
+/* ========== 通知：流光边框 ========== */
+[data-theme="cyberpunk"] .notification {
+  border-left: 4px solid var(--accent-secondary);
+  background: rgba(255,0,127,0.1);
+  box-shadow: 0 0 15px rgba(255,0,127,0.3);
+}
+
+/* ========== 滚动条 ========== */
+[data-theme="cyberpunk"] ::-webkit-scrollbar { width: 8px; }
+[data-theme="cyberpunk"] ::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  box-shadow: inset 0 0 5px rgba(0,240,255,0.2);
+}
+[data-theme="cyberpunk"] ::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb); border-radius: 4px;
+  box-shadow: 0 0 10px var(--accent-primary);
+}
+
+/* ========== 动画 ========== */
+@keyframes glitch {
+  0%, 100% { text-shadow: 0 0 5px #0ff, 0 0 15px #0ff, 2px 2px 0 #f0f, -2px -2px 0 #0ff; }
+  15% { text-shadow: -2px 2px 0 #f0f, 2px -2px 0 #0ff; }
+  30% { text-shadow: 2px -2px 0 #0ff, -2px 2px 0 #f0f; }
+  45% { text-shadow: -2px 0 0 #f0f, 2px 0 0 #0ff; }
+  60% { text-shadow: 0 0 5px #0ff, 0 0 20px #0ff; }
+  75% { text-shadow: 0 0 10px #f0f, 0 0 5px #0ff; }
 }

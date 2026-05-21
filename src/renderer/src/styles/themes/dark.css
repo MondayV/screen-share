@@ -1,19 +1,19 @@
 [data-theme="dark"] {
-  --bg-primary: #1e1e2e;
-  --bg-secondary: #2a2a3a;
-  --text-primary: #e0e0ff;
-  --text-secondary: #a0a0cc;
-  --accent-primary: #7b68ee;
-  --accent-secondary: #ff6b9d;
-  --border-color: #3e3e5e;
-  --shadow: 0 2px 8px rgba(0,0,0,0.5);
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #2d2d2d;
+  --text-primary: #e0e0e0;
+  --text-secondary: #a0a0a0;
+  --accent-primary: #4ecdc4;
+  --accent-secondary: #ff6b6b;
+  --border-color: #3e3e3e;
+  --shadow: 0 2px 8px rgba(0,0,0,0.4);
   --font-ui: 'Inter', sans-serif;
   --font-mono: 'Fira Code', monospace;
   --transition-speed: 0.2s;
   --button-radius: 6px;
-  --card-bg: #2a2a3a;
-  --input-bg: #1e1e2e;
-  --input-focus-shadow: 0 0 0 2px rgba(123,104,238,0.4);
-  --scrollbar-thumb: #5a5a8a;
-  --scrollbar-track: #2a2a3a;
+  --card-bg: #2d2d2d;
+  --input-bg: #1e1e1e;
+  --input-focus-shadow: 0 0 0 2px rgba(78,205,196,0.4);
+  --scrollbar-thumb: #555;
+  --scrollbar-track: #2d2d2d;
 }
