@@ -108,9 +108,30 @@ export const ipcMainHandlersInit = (): void => {
     delete env.http_proxy; delete env.https_proxy
     delete env.HTTP_PROXY; delete env.HTTPS_PROXY
 
+    const checkCloudflared = (p: string): Promise<string | null> => {
+      return new Promise((resolve) => {
+        const proc = spawn(p, ['--version'], { windowsHide: true })
+        let stderr = ''
+        proc.stderr?.on('data', (d) => { stderr += d.toString() })
+        proc.on('close', (code) => { resolve(code !== 0 ? (stderr || `exit code ${code}`) : null) })
+        proc.on('error', (err) => resolve(err.message))
+        setTimeout(() => resolve('自检超时'), 5000)
+      })
+    }
+
     const startTunnel = async (): Promise<string> => {
       const cfPath = getCloudflaredPath()
       console.log('[Cloudflared] 使用路径:', cfPath)
+      const checkErr = await checkCloudflared(cfPath)
+      if (checkErr) {
+        if (checkErr.includes('VCRUNTIME') || checkErr.includes('DLL') || checkErr.includes('140')) {
+          throw new Error('缺少 Visual C++ 运行库，请下载安装: https://aka.ms/vs/17/release/vc_redist.x64.exe')
+        }
+        if (checkErr.includes('Permission') || checkErr.includes('denied') || checkErr.includes('EACCES')) {
+          throw new Error('cloudflared 被系统或杀毒软件阻止，请将 PCConnect 添加至信任列表')
+        }
+        throw new Error(`Cloudflared 组件异常: ${checkErr}`)
+      }
       if (cloudflaredProcess) { cloudflaredProcess.kill(); cloudflaredProcess = null }
       cloudflaredProcess = spawn(cfPath, ['tunnel', '--url', 'http://localhost:8888', '--no-autoupdate'], { env, windowsHide: true })
       let buffer = ''
