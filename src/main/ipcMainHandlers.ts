@@ -107,25 +107,52 @@ export const ipcMainHandlersInit = (): void => {
     if (!cloudflaredProcess) {
       const cfPath = getCloudflaredPath()
       console.log('[Cloudflared] 使用路径:', cfPath)
-      cloudflaredProcess = spawn(cfPath, ['tunnel', '--url', 'http://localhost:8888', '--no-autoupdate'])
+      const env = { ...process.env }
+      delete env.http_proxy; delete env.https_proxy
+      delete env.HTTP_PROXY; delete env.HTTPS_PROXY
+      cloudflaredProcess = spawn(cfPath, ['tunnel', '--url', 'http://localhost:8888', '--no-autoupdate'], {
+        env, windowsHide: true
+      })
       cloudflaredProcess.stdout?.on('data', (d) => console.log('[Cloudflared]', d.toString().trim()))
       cloudflaredProcess.stderr?.on('data', (d) => console.log('[Cloudflared]', d.toString().trim()))
     }
-    const timeout2 = setTimeout(() => {
-      cloudflaredProcess?.kill()
-      throw new Error('Cloudflared 隧道启动超时(60秒)，请确认 cloudflared 已安装')
-    }, 60000)
-    const publicUrl = await new Promise<string>((resolve, reject) => {
-      cloudflaredProcess!.stdout?.on('data', (d) => {
-        const m = d.toString().match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/)
-        if (m) { clearTimeout(timeout2); resolve(m[0]) }
-      })
-      cloudflaredProcess!.stderr?.on('data', (d) => {
-        const m = d.toString().match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/)
-        if (m) { clearTimeout(timeout2); resolve(m[0]) }
-      })
-      cloudflaredProcess!.on('error', (e) => { clearTimeout(timeout2); console.error('[Cloudflared]', e); reject(e) })
-    })
+    let publicUrl = ''
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      cloudflaredProcess?.removeAllListeners('error')
+      const timeout2 = setTimeout(() => {
+        cloudflaredProcess?.kill()
+      }, 120000)
+      try {
+        publicUrl = await new Promise<string>((resolve, reject) => {
+          cloudflaredProcess!.stdout?.on('data', (d) => {
+            const m = d.toString().match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/)
+            if (m) { clearTimeout(timeout2); resolve(m[0]) }
+          })
+          cloudflaredProcess!.stderr?.on('data', (d) => {
+            const m = d.toString().match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/)
+            if (m) { clearTimeout(timeout2); resolve(m[0]) }
+          })
+          cloudflaredProcess!.on('error', (e) => { clearTimeout(timeout2); reject(e) })
+          cloudflaredProcess!.on('close', (code) => { clearTimeout(timeout2); reject(new Error(`Cloudflared 进程退出，exit code: ${code}`)) })
+        })
+        clearTimeout(timeout2)
+        break
+      } catch (e) {
+        console.error(`[Cloudflared] 尝试 ${attempt} 失败:`, (e as Error).message)
+        if (attempt === 2) throw e
+        cloudflaredProcess?.kill()
+        cloudflaredProcess = null
+        const cfPath2 = getCloudflaredPath()
+        const env2 = { ...process.env }
+        delete env2.http_proxy; delete env2.https_proxy
+        delete env2.HTTP_PROXY; delete env2.HTTPS_PROXY
+        cloudflaredProcess = spawn(cfPath2, ['tunnel', '--url', 'http://localhost:8888', '--no-autoupdate'], {
+          env: env2, windowsHide: true
+        })
+        cloudflaredProcess.stdout?.on('data', (d) => console.log('[Cloudflared]', d.toString().trim()))
+        cloudflaredProcess.stderr?.on('data', (d) => console.log('[Cloudflared]', d.toString().trim()))
+      }
+    }
     const streamKey = Math.random().toString(36).slice(2, 8).toUpperCase()
     return { publicUrl, streamKey }
   })

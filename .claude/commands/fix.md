@@ -1,59 +1,78 @@
-# 指令：OBS 手动降级 + CSP 加固 + 发布 v2.2.2
+# 指令：修复打包版 cloudflared 隧道启动超时
 
-## 目标
-1. OBS 连接失败时不中断流程，进入手动推流模式（仅启动 MediaMTX + cloudflared，生成公网链接，提示用户手动推流）。
-2. 确保生产环境 CSP 允许连接 `ws://localhost:4455`。
-3. 重新构建安装包并发布 v2.2.2 修复版本。
-4. 更新 README 中的使用说明，强调首次需配置 OBS WebSocket。
+## 问题
+打包安装后，点击“开始共享”卡死在启动界面，60s 后报错 `cloudflare隧道启动超时`。开发模式下正常。
 
-## 修改步骤
+## 根本原因
+- 打包后 `cloudflared.exe` 的路径获取可能不正确，或执行权限受限。
+- cloudflared 进程因网络环境（代理、防火墙）无法连接到 Cloudflare 边缘节点。
+- 超时时间过短，打包后的首次启动网络延迟较高。
+- 环境变量（如 `http_proxy`）可能干扰 cloudflared 连接。
 
-### 1. 应用 OBS 手动降级逻辑
-- 打开 `src/renderer/src/Host.svelte`。
-- 按照 `obs-fallback.md` 指令中的要求，修改 `startShare` 和 `stopShare` 函数，增加 `obsManualMode` 状态。
-- 在 UI 中添加手动模式提示（当 `obsManualMode` 为 `true` 时显示 OBS 配置和手动推流指引）。
+## 修复步骤（AI 严格按序执行）
 
-### 2. 加固 CSP 配置
-- 检查 `src/renderer/index.html` 的 `<meta>` 标签，确认 `connect-src` 包含 `ws://localhost:4455` 和 `ws://127.0.0.1:4455`。
-- 为避免缓存问题，在主进程 `src/main/index.ts` 中 **额外添加 CSP 头**（双重保险）：
+### 1. 修正 `getCloudflaredPath()` 函数
+- 打开 `src/main/index.ts`，找到 `getCloudflaredPath()`（或类似函数）。
+- 确保打包后路径正确指向 `resources/tools/cloudflared.exe`：
   ```ts
-  app.on('web-contents-created', (_, contents) => {
-    contents.session.webRequest.onHeadersReceived((details, callback) => {
-      callback({
-        responseHeaders: {
-          ...details.responseHeaders,
-          'Content-Security-Policy': [
-            "default-src 'self'; connect-src 'self' ws: wss: https://*.trycloudflare.com ws://localhost:4455 ws://127.0.0.1:4455; media-src 'self' blob: https://*.trycloudflare.com; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'"
-          ]
-        }
-      });
-    });
-  });
-这样即使 HTML 中的 meta 未生效，主进程也会强制添加 CSP。
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'tools', 'cloudflared.exe');
+  }
+添加日志：console.log('[cloudflared] 使用路径:', cloudflaredPath);
 
-3. 升级版本号并构建
-修改 package.json 版本为 2.2.2。
+确保开发模式下能正确找到系统已安装的版本。
 
-清理构建：rm -rf release out && npm run build:win。
+2. 优化 start-cloudflared IPC handler
+在 spawn 时增加 env 选项，清除代理变量：
 
-4. 更新 README.md
-在“使用教程”部分明确标注：
+ts
+const env = { ...process.env };
+delete env.HTTP_PROXY;
+delete env.HTTPS_PROXY;
+delete env.http_proxy;
+delete env.https_proxy;
+cloudflaredProcess = spawn(cloudflaredPath, ['tunnel', '--url', 'http://localhost:8888'], {
+  cwd: app.getPath('userData'), // 避免权限问题
+  env,
+  windowsHide: true
+});
+监听 stderr 并输出到主进程控制台，便于排查网络错误。
 
-markdown
-### ⚠️ 重要：首次使用前请配置 OBS
-1. 打开 OBS Studio，点击 **工具 → obs-websocket 设置**。
-2. 勾选“启用 WebSocket 服务器”，默认端口 4455，可设置密码（应用内需填写）。
-3. 如果不想自动推流，可直接在 OBS 中手动开始推流（应用会显示推流地址和密钥）。
-5. 提交并发布
+将超时时间延长至 120 秒（因为首次启动可能网络协商较慢）。
+
+如果进程意外退出（close 事件），立即 reject 并附上退出码和错误信息。
+
+3. 增加重试机制
+如果首次启动超时，自动重试一次（共两次尝试）。
+
+在 UI 上显示“正在建立隧道连接…”的进度提示。
+
+4. 添加防火墙/网络问题的友好提示
+捕获 ECONNREFUSED、ETIMEDOUT 等错误，在 UI 提示“隧道连接失败，请检查网络或关闭代理软件”。
+
+5. 验证打包后的路径
+构建后，检查 release/win-unpacked/resources/tools/cloudflared.exe 是否存在且可执行。
+
+如果文件缺失，检查 electron-builder.yml 的 extraResources 配置是否正确。
+
+6. 更新 README（可选）
+在常见问题中添加：“如果隧道启动超时，请检查杀毒软件是否拦截了 cloudflared.exe，或尝试关闭代理软件。”
+
+7. 重新构建并发布 v2.2.3
+修改 package.json 版本为 2.2.3。
+
+清理构建：rm -rf release out && npm run build:win
+
+提交并推送标签：
+
 bash
-git add -A
-git commit -m "fix: OBS连接失败时手动降级，加固CSP，发布v2.2.2"
-git tag v2.2.2 -m "v2.2.2 修复OBS连接问题，支持手动推流"
+git add -A && git commit -m "fix: 修复安装版cloudflared隧道启动超时，发布v2.2.3"
+git tag v2.2.3 -m "v2.2.3 修复隧道连接问题"
 git push origin main --tags
-gh release create v2.2.2 release/PCConnect\ Setup\ 2.2.2.exe --title "v2.2.2 修复OBS连接问题" --notes "修复：OBS未启动时不再报错，自动进入手动模式；加固CSP，确保连接本地WebSocket"
+gh release create v2.2.3 release/PCConnect\ Setup\ 2.2.3.exe --title "v2.2.3 修复隧道启动超时" --notes "修复：打包版cloudflared路径、代理干扰、超时延长、自动重试。请所有用户更新。"
 验收标准
-安装新版本后，即使 OBS 未启动，点击“开始共享”也能生成公网链接，并显示手动推流指引。
+安装新版本后，点击“开始共享”能在 30 秒内生成公网链接（首次可能需要 1-2 分钟）。
 
-打开 OBS 并正确配置 WebSocket 后，可自动连接推流。
+如果网络不通，应用给出明确提示，而不是静默超时。
 
-安装包在所有环境中都能正常连接 OBS（CSP 不再拦截）。
+控制台日志清晰显示 cloudflared 的路径和输出。
