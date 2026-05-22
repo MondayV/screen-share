@@ -4,6 +4,8 @@
   import { L } from './translations'
   import { useNavigationEnabled, useIsHosting, useActiveView } from './stores'
   import { connectToOBS, startStream, stopStream, disconnectOBS } from './lib/obs-controller'
+  import { connect, disconnect } from './lib/signaling'
+  import Chat from './Chat.svelte'
 
   const navigationEnabled = useNavigationEnabled()
   const isHosting = useIsHosting()
@@ -28,6 +30,7 @@
       hlsUrl = `${publicUrl}/${streamKey}/index.m3u8`
 
       await startStream()
+      try { await connect(streamKey) } catch { /* chat offline */ }
       Swal.close()
 
       sessionActive = true
@@ -66,6 +69,7 @@
     if (!result.isConfirmed) return
     try { await stopStream() } catch {}
     disconnectOBS()
+    disconnect()
     try { await window.PcConnectApi.stopStreaming() } catch {}
     publicUrl = ''
     streamKey = ''
@@ -121,6 +125,8 @@
         <span>复制服务器+密钥</span>
       </button>
     </div>
+
+    <Chat />
 
     <div class="has-text-centered mt-5">
       <button class="button is-danger is-large" on:click={onStopClick}>
