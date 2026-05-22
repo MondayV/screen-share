@@ -11,6 +11,11 @@ files:
   - '!{.typesafe-i18n.json,svelte.config.mjs,tsconfig.json,tsconfig.node.json}'
   - '!{.claude,screenshots,.github}'
   - '!dev-app-update.yml'
+extraResources:
+  - from: "resources/tools"
+    to: "tools"
+    filter:
+      - "*.exe"
 win:
   executableName: PCConnect
   icon: build/icon.ico

@@ -6,7 +6,17 @@ import { spawn, ChildProcess } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 
+function getMediaMTXPath(): string {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'tools', 'mediamtx.exe')
+  }
+  return 'C:\\mediamtx\\mediamtx.exe'
+}
+
 function getCloudflaredPath(): string {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'tools', 'cloudflared.exe')
+  }
   const userProfile = process.env.USERPROFILE || 'C:\\Users\\MONv'
   const candidates = [
     path.join(userProfile, 'scoop', 'apps', 'cloudflared', 'current', 'cloudflared.exe'),
@@ -75,12 +85,12 @@ export const ipcMainHandlersInit = (): void => {
   })
   ipcMain.handle('startStreaming', async (): Promise<{ publicUrl: string; streamKey: string }> => {
     if (!mediamtxProcess) {
-      mediamtxProcess = spawn('C:\\mediamtx\\mediamtx.exe', [], { cwd: 'C:\\mediamtx' })
+      mediamtxProcess = spawn(getMediaMTXPath(), [], { cwd: path.dirname(getMediaMTXPath()) })
       mediamtxProcess.stderr?.on('data', (d) => console.log('[MediaMTX]', d.toString().trim()))
       mediamtxProcess.stdout?.on('data', (d) => console.log('[MediaMTX]', d.toString().trim()))
       const timeout = setTimeout(() => {
         mediamtxProcess?.kill()
-        throw new Error('MediaMTX 启动超时（30秒），请确认 C:\\mediamtx\\mediamtx.exe 存在且未被防火墙拦截')
+        throw new Error('MediaMTX 启动超时（30秒），请重试或重启应用')
       }, 30000)
       try {
         await new Promise<void>((resolve, reject) => {
