@@ -95,11 +95,16 @@ export const ipcMainHandlersInit = (): void => {
       } catch { clearTimeout(timeout); throw new Error('MediaMTX 启动失败') }
     }
     if (!cloudflaredProcess) {
-      cloudflaredProcess = spawn(getCloudflaredPath(), ['tunnel', '--url', 'http://localhost:8888'])
+      const cfPath = getCloudflaredPath()
+      console.log('[Cloudflared] 使用路径:', cfPath)
+      cloudflaredProcess = spawn(cfPath, ['tunnel', '--url', 'http://localhost:8888', '--no-autoupdate'])
+      cloudflaredProcess.stdout?.on('data', (d) => console.log('[Cloudflared]', d.toString().trim()))
+      cloudflaredProcess.stderr?.on('data', (d) => console.log('[Cloudflared]', d.toString().trim()))
     }
     const timeout2 = setTimeout(() => {
-      throw new Error('Cloudflared 隧道启动超时，请确认 cloudflared 已安装')
-    }, 30000)
+      cloudflaredProcess?.kill()
+      throw new Error('Cloudflared 隧道启动超时(60秒)，请确认 cloudflared 已安装')
+    }, 60000)
     const publicUrl = await new Promise<string>((resolve, reject) => {
       cloudflaredProcess!.stdout?.on('data', (d) => {
         const m = d.toString().match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/)
@@ -109,7 +114,7 @@ export const ipcMainHandlersInit = (): void => {
         const m = d.toString().match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/)
         if (m) { clearTimeout(timeout2); resolve(m[0]) }
       })
-      cloudflaredProcess!.on('error', (e) => { clearTimeout(timeout2); reject(e) })
+      cloudflaredProcess!.on('error', (e) => { clearTimeout(timeout2); console.error('[Cloudflared]', e); reject(e) })
     })
     const streamKey = Math.random().toString(36).slice(2, 8).toUpperCase()
     return { publicUrl, streamKey }
