@@ -104,55 +104,34 @@ export const ipcMainHandlersInit = (): void => {
         })
       } catch { clearTimeout(timeout); throw new Error('MediaMTX 启动失败') }
     }
-    if (!cloudflaredProcess) {
+    const env = { ...process.env }
+    delete env.http_proxy; delete env.https_proxy
+    delete env.HTTP_PROXY; delete env.HTTPS_PROXY
+
+    const startTunnel = async (): Promise<string> => {
       const cfPath = getCloudflaredPath()
       console.log('[Cloudflared] 使用路径:', cfPath)
-      const env = { ...process.env }
-      delete env.http_proxy; delete env.https_proxy
-      delete env.HTTP_PROXY; delete env.HTTPS_PROXY
-      cloudflaredProcess = spawn(cfPath, ['tunnel', '--url', 'http://localhost:8888', '--no-autoupdate'], {
-        env, windowsHide: true
+      if (cloudflaredProcess) { cloudflaredProcess.kill(); cloudflaredProcess = null }
+      cloudflaredProcess = spawn(cfPath, ['tunnel', '--url', 'http://localhost:8888', '--no-autoupdate'], { env, windowsHide: true })
+      let buffer = ''
+      cloudflaredProcess.stderr?.on('data', (d) => { buffer += d.toString(); console.log('[Cloudflared]', d.toString().trim()) })
+      cloudflaredProcess.stdout?.on('data', (d) => { buffer += d.toString(); console.log('[Cloudflared]', d.toString().trim()) })
+      return new Promise<string>((resolve, reject) => {
+        const done = (url: string) => { clearTimeout(timer); resolve(url) }
+        const fail = (err: Error) => { clearTimeout(timer); reject(err) }
+        const check = (data: string) => {
+          const m = data.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/)
+          if (m) done(m[0])
+        }
+        cloudflaredProcess!.stderr?.on('data', (d) => check(d.toString()))
+        cloudflaredProcess!.stdout?.on('data', (d) => check(d.toString()))
+        cloudflaredProcess!.on('error', (e) => fail(e))
+        cloudflaredProcess!.on('close', (code) => fail(new Error(`Cloudflared 进程退出(code ${code})`)))
+        const timer = setTimeout(() => { fail(new Error('Cloudflared 隧道启动超时')) }, 90000)
       })
-      cloudflaredProcess.stdout?.on('data', (d) => console.log('[Cloudflared]', d.toString().trim()))
-      cloudflaredProcess.stderr?.on('data', (d) => console.log('[Cloudflared]', d.toString().trim()))
     }
-    let publicUrl = ''
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      cloudflaredProcess?.removeAllListeners('error')
-      const timeout2 = setTimeout(() => {
-        cloudflaredProcess?.kill()
-      }, 120000)
-      try {
-        publicUrl = await new Promise<string>((resolve, reject) => {
-          cloudflaredProcess!.stdout?.on('data', (d) => {
-            const m = d.toString().match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/)
-            if (m) { clearTimeout(timeout2); resolve(m[0]) }
-          })
-          cloudflaredProcess!.stderr?.on('data', (d) => {
-            const m = d.toString().match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/)
-            if (m) { clearTimeout(timeout2); resolve(m[0]) }
-          })
-          cloudflaredProcess!.on('error', (e) => { clearTimeout(timeout2); reject(e) })
-          cloudflaredProcess!.on('close', (code) => { clearTimeout(timeout2); reject(new Error(`Cloudflared 进程退出，exit code: ${code}`)) })
-        })
-        clearTimeout(timeout2)
-        break
-      } catch (e) {
-        console.error(`[Cloudflared] 尝试 ${attempt} 失败:`, (e as Error).message)
-        if (attempt === 2) throw e
-        cloudflaredProcess?.kill()
-        cloudflaredProcess = null
-        const cfPath2 = getCloudflaredPath()
-        const env2 = { ...process.env }
-        delete env2.http_proxy; delete env2.https_proxy
-        delete env2.HTTP_PROXY; delete env2.HTTPS_PROXY
-        cloudflaredProcess = spawn(cfPath2, ['tunnel', '--url', 'http://localhost:8888', '--no-autoupdate'], {
-          env: env2, windowsHide: true
-        })
-        cloudflaredProcess.stdout?.on('data', (d) => console.log('[Cloudflared]', d.toString().trim()))
-        cloudflaredProcess.stderr?.on('data', (d) => console.log('[Cloudflared]', d.toString().trim()))
-      }
-    }
+
+    const publicUrl = await startTunnel()
     const streamKey = Math.random().toString(36).slice(2, 8).toUpperCase()
     return { publicUrl, streamKey }
   })
