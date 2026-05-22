@@ -208,7 +208,7 @@
           placeholder="留空表示无密码"
         />
       </div>
-      <p class="help">在 OBS → 工具 → obs-websocket 设置 中查看</p>
+      <p class="help">OBS → 工具 → WebSocket 服务器设置 → 插件设置中勾选开启服务器 → 服务器设置中适配端口生成密码 → 显示连接信息里复制生成的密码</p>
     </div>
 
     <h2>{L.advanced()}</h2>
