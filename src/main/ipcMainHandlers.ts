@@ -76,10 +76,12 @@ export const ipcMainHandlersInit = (): void => {
   ipcMain.handle('startStreaming', async (): Promise<{ publicUrl: string; streamKey: string }> => {
     if (!mediamtxProcess) {
       mediamtxProcess = spawn('C:\\mediamtx\\mediamtx.exe', [], { cwd: 'C:\\mediamtx' })
+      mediamtxProcess.stderr?.on('data', (d) => console.log('[MediaMTX]', d.toString().trim()))
+      mediamtxProcess.stdout?.on('data', (d) => console.log('[MediaMTX]', d.toString().trim()))
       const timeout = setTimeout(() => {
         mediamtxProcess?.kill()
-        throw new Error('MediaMTX 启动超时，请确认 C:\\mediamtx\\mediamtx.exe 存在')
-      }, 10000)
+        throw new Error('MediaMTX 启动超时（30秒），请确认 C:\\mediamtx\\mediamtx.exe 存在且未被防火墙拦截')
+      }, 30000)
       try {
         await new Promise<void>((resolve, reject) => {
           mediamtxProcess!.stdout?.on('data', (d) => {
