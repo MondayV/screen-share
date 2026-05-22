@@ -13,44 +13,35 @@
   let publicUrl = ''
   let streamKey = ''
   let hlsUrl = ''
+  let obsManualMode = false
 
   onDestroy(() => { disconnectOBS() })
 
   const onStartClick = async (): Promise<void> => {
     try {
-      Swal.fire({ title: '正在启动...', text: '连接 OBS + 启动串流服务', allowOutsideClick: false, didOpen: () => Swal.showLoading() })
-
-      await connectToOBS()
+      Swal.fire({ title: '正在启动...', text: '启动串流服务', allowOutsideClick: false, didOpen: () => Swal.showLoading() })
 
       const result = await window.PcConnectApi.startStreaming()
       publicUrl = result.publicUrl
       streamKey = result.streamKey
       hlsUrl = `${publicUrl}/${streamKey}/index.m3u8`
 
-      await startStream()
-      Swal.close()
+      try {
+        await connectToOBS()
+        await startStream()
+        obsManualMode = false
+      } catch {
+        obsManualMode = true
+      }
 
+      Swal.close()
       sessionActive = true
       $navigationEnabled = false
       $isHosting = true
     } catch (e) {
       console.error('Start failed:', e)
       Swal.close()
-      const msg = (e as Error).message || ''
-      if (msg.includes('密码') || msg.includes('authentication')) {
-        Swal.fire({
-          icon: 'error',
-          title: 'OBS 连接失败',
-          text: msg,
-          confirmButtonText: '打开设置修改密码',
-          showCancelButton: true,
-          cancelButtonText: '关闭'
-        }).then((r) => {
-          if (r.isConfirmed) $activeView = 'settings'
-        })
-      } else {
-        Swal.fire({ position: 'top-end', icon: 'error', title: msg || '启动失败', showConfirmButton: false, timer: 3000 })
-      }
+      Swal.fire({ position: 'top-end', icon: 'error', title: '启动失败，请重试', showConfirmButton: false, timer: 3000 })
     }
   }
 
@@ -102,7 +93,11 @@
 
     <div class="box">
       <p class="heading">OBS 推流信息</p>
-      <p class="mb-2 has-text-success">✅ OBS 已连接，正在推流</p>
+      {#if obsManualMode}
+        <p class="mb-2 has-text-warning">⚠️ OBS 未连接，请在 OBS 中手动开始推流</p>
+      {:else}
+        <p class="mb-2 has-text-success">✅ OBS 已连接，正在推流</p>
+      {/if}
       <p class="mb-2">首次使用请在 OBS 设置 → 流中配置：</p>
       <div class="field">
         <label class="label">服务器</label>

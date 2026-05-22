@@ -100,6 +100,17 @@ async function createWindow(): Promise<void> {
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId('net.getpcconnect')
 
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self'; connect-src 'self' ws: wss: https://*.trycloudflare.com https://*.workers.dev ws://localhost:4455 ws://127.0.0.1:4455; media-src 'self' blob: https://*.trycloudflare.com; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data: blob:"
+        ]
+      }
+    })
+  })
+
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })

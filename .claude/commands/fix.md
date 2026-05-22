@@ -1,97 +1,59 @@
- 指令：将 MediaMTX 和 cloudflared 打包进安装程序，彻底移除外部依赖
+# 指令：OBS 手动降级 + CSP 加固 + 发布 v2.2.2
 
 ## 目标
-- 主持人点击“开始共享”时，不再提示缺少 `C:\mediamtx\mediamtx.exe` 或 `cloudflared`。
-- 所有依赖文件随应用安装到本地，路径由应用自动管理。
-- 更新 `README.md` 移除手动下载说明。
-- 不影响开发模式（开发时仍使用系统中已安装的版本）。
+1. OBS 连接失败时不中断流程，进入手动推流模式（仅启动 MediaMTX + cloudflared，生成公网链接，提示用户手动推流）。
+2. 确保生产环境 CSP 允许连接 `ws://localhost:4455`。
+3. 重新构建安装包并发布 v2.2.2 修复版本。
+4. 更新 README 中的使用说明，强调首次需配置 OBS WebSocket。
 
-## 前置条件
-- 当前系统已安装：
-  - `C:\mediamtx\mediamtx.exe`（MediaMTX 主程序）
-  - `cloudflared.exe`（通过 Scoop 或手动安装，路径可通过 `where cloudflared` 查到）
+## 修改步骤
 
-## 执行步骤
+### 1. 应用 OBS 手动降级逻辑
+- 打开 `src/renderer/src/Host.svelte`。
+- 按照 `obs-fallback.md` 指令中的要求，修改 `startShare` 和 `stopShare` 函数，增加 `obsManualMode` 状态。
+- 在 UI 中添加手动模式提示（当 `obsManualMode` 为 `true` 时显示 OBS 配置和手动推流指引）。
 
-### 1. 准备资源文件
-- 在项目根目录创建 `resources/tools/` 目录（如果不存在则创建）。
-- 将 `C:\mediamtx\mediamtx.exe` 复制到 `resources/tools/mediamtx.exe`。
-- 找到 `cloudflared.exe` 的完整路径（在终端执行 `where cloudflared`，通常为 `C:\Users\MONv\scoop\shims\cloudflared.exe` 或 `C:\Users\MONv\scoop\apps\cloudflared\current\cloudflared.exe`），将其复制到 `resources/tools/cloudflared.exe`。
+### 2. 加固 CSP 配置
+- 检查 `src/renderer/index.html` 的 `<meta>` 标签，确认 `connect-src` 包含 `ws://localhost:4455` 和 `ws://127.0.0.1:4455`。
+- 为避免缓存问题，在主进程 `src/main/index.ts` 中 **额外添加 CSP 头**（双重保险）：
+  ```ts
+  app.on('web-contents-created', (_, contents) => {
+    contents.session.webRequest.onHeadersReceived((details, callback) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'Content-Security-Policy': [
+            "default-src 'self'; connect-src 'self' ws: wss: https://*.trycloudflare.com ws://localhost:4455 ws://127.0.0.1:4455; media-src 'self' blob: https://*.trycloudflare.com; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'"
+          ]
+        }
+      });
+    });
+  });
+这样即使 HTML 中的 meta 未生效，主进程也会强制添加 CSP。
 
-### 2. 配置 electron-builder
-- 打开 `electron-builder.yml`（或 `package.json` 的 `build` 字段）。
-- 添加 `extraResources` 配置（如果已存在则合并）：
-  ```yaml
-  extraResources:
-    - from: "resources/tools"
-      to: "tools"
-      filter:
-        - "*.exe"
-这会将 resources/tools/mediamtx.exe 和 cloudflared.exe 打包到安装目录下的 resources/tools/ 文件夹中，并随应用分发。
+3. 升级版本号并构建
+修改 package.json 版本为 2.2.2。
 
-3. 修改主进程中依赖路径的获取逻辑
-打开 src/main/index.ts，添加一个辅助函数，根据是否打包返回正确路径：
+清理构建：rm -rf release out && npm run build:win。
 
-ts
-import { app } from 'electron';
-import path from 'path';
+4. 更新 README.md
+在“使用教程”部分明确标注：
 
-function getMediaMTXPath(): string {
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'tools', 'mediamtx.exe');
-  }
-  return 'C:\\mediamtx\\mediamtx.exe'; // 开发模式
-}
-
-function getCloudflaredPath(): string {
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'tools', 'cloudflared.exe');
-  }
-  // 开发模式：尝试多种路径
-  const possiblePaths = [
-    path.join(app.getPath('userData'), 'bin', 'cloudflared.exe'),
-    'cloudflared.exe', // 依赖系统 PATH
-  ];
-  for (const p of possiblePaths) {
-    if (require('fs').existsSync(p)) return p;
-  }
-  return 'cloudflared.exe';
-}
-修改 start-mediamtx IPC handler 中 spawn 调用的第一个参数，使用 getMediaMTXPath() 而不是硬编码的 'C:\\mediamtx\\mediamtx.exe'。
-
-修改 start-cloudflared IPC handler，使用 getCloudflaredPath() 代替 getCloudflaredPath() 的旧实现（如果有），或直接使用该函数。
-
-4. 清理旧依赖逻辑
-删除 src/main/dependency-manager.ts 中的自动下载代码（如果存在）。
-
-删除任何与“检查并下载依赖”相关的函数调用。
-
-确保应用不会再尝试从网络下载 MediaMTX 或 cloudflared。
-
-5. 更新 README.md
-找到“主持方依赖”部分，将其替换为：
-
-text
-### 系统要求
-- Windows 10 或更高版本
-- 应用已内置所需组件，无需额外安装
-删除任何“自动下载”、“手动下载链接”的提示。
-
-6. 测试与打包
-更新版本2.2.1
-执行 rm -rf release out && npm run build:win。
-
-安装生成的安装包，在安装目录的 resources/tools/ 下确认 mediamtx.exe 和 cloudflared.exe 存在。
-
-启动应用，点击“开始共享”，确认 MediaMTX 和 cloudflared 均能正常启动，无“缺少文件”错误。
-
-测试观众端观看功能正常。
-
+markdown
+### ⚠️ 重要：首次使用前请配置 OBS
+1. 打开 OBS Studio，点击 **工具 → obs-websocket 设置**。
+2. 勾选“启用 WebSocket 服务器”，默认端口 4455，可设置密码（应用内需填写）。
+3. 如果不想自动推流，可直接在 OBS 中手动开始推流（应用会显示推流地址和密钥）。
+5. 提交并发布
+bash
+git add -A
+git commit -m "fix: OBS连接失败时手动降级，加固CSP，发布v2.2.2"
+git tag v2.2.2 -m "v2.2.2 修复OBS连接问题，支持手动推流"
+git push origin main --tags
+gh release create v2.2.2 release/PCConnect\ Setup\ 2.2.2.exe --title "v2.2.2 修复OBS连接问题" --notes "修复：OBS未启动时不再报错，自动进入手动模式；加固CSP，确保连接本地WebSocket"
 验收标准
-安装包中包含了 MediaMTX 和 cloudflared。
+安装新版本后，即使 OBS 未启动，点击“开始共享”也能生成公网链接，并显示手动推流指引。
 
-新安装的机器上，无需手动下载任何工具，主持人可以一键开始共享。
+打开 OBS 并正确配置 WebSocket 后，可自动连接推流。
 
-开发模式下仍可使用本地已安装的工具。
-
-README 已更新，不再提及额外依赖。
+安装包在所有环境中都能正常连接 OBS（CSP 不再拦截）。
