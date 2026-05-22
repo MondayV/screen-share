@@ -4,9 +4,6 @@
   import Hls from 'hls.js'
   import { L } from './translations'
   import { useNavigationEnabled, useIsWatching } from './stores'
-  import { connect, disconnect } from './lib/signaling'
-  import Chat from './Chat.svelte'
-  import Annotation from './Annotation.svelte'
 
   const navigationEnabled = useNavigationEnabled()
   const isWatching = useIsWatching()
@@ -61,7 +58,6 @@
     joinAttempting = true
     errorShown = false
     Swal.fire({ title: '正在连接...', allowOutsideClick: false, didOpen: () => Swal.showLoading() })
-    try { await connect(playUrl.split('/').slice(-2)[0]) } catch { /* chat offline */ }
     startPlayback(playUrl)
   }
 
@@ -73,7 +69,6 @@
       cancelButtonText: '取消'
     })
     if (!result.isConfirmed) return
-    disconnect()
     if (hls) { hls.destroy(); hls = null }
     remoteScreen.src = ''
     isStreaming = false
@@ -175,8 +170,6 @@
       </button>
     </div>
   </div>
-  <Annotation videoElement={remoteScreen} />
-  <Chat />
 </div>
 
 <style>
