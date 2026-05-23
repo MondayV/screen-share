@@ -229,4 +229,24 @@ export const ipcMainHandlersInit = (): void => {
 
     return results
   })
+  ipcMain.handle('checkObsConnection', async () => {
+    const net = require('net')
+    return new Promise((resolve) => {
+      const s = net.createConnection({ host: '127.0.0.1', port: 4455 })
+      s.setTimeout(3000)
+      s.on('connect', () => { s.end(); resolve({ connected: true, reason: '' }) })
+      s.on('timeout', () => { s.destroy(); resolve({ connected: false, reason: 'OBS WebSocket 连接超时' }) })
+      s.on('error', () => { s.destroy(); resolve({ connected: false, reason: '无法连接 OBS，请确认 OBS 已启动并开启 WebSocket 服务' }) })
+    })
+  })
+  ipcMain.handle('checkPathActive', async (_e, streamKey: string) => {
+    try {
+      const res = await fetch('http://localhost:9997/v3/paths/list')
+      const data = await res.json() as any
+      const path = data.items?.find((p: any) => p.name === streamKey)
+      if (path?.sourceReady) return { active: true, reason: '' }
+      if (path) return { active: false, reason: '推流未到达，请检查 OBS 推流密钥是否填写正确' }
+      return { active: false, reason: '未检测到推流路径，请确认已在 OBS 中填入正确的串流密钥并开始推流' }
+    } catch { return { active: false, reason: '无法查询 MediaMTX 状态' } }
+  })
 }

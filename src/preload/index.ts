@@ -83,6 +83,12 @@ const PcConnectApi = {
   },
   addMediamtxPath: async (key: string): Promise<boolean> => {
     return await ipcRenderer.invoke('addMediamtxPath', key)
+  },
+  checkObsConnection: async (): Promise<{ connected: boolean; reason: string }> => {
+    return await ipcRenderer.invoke('checkObsConnection')
+  },
+  checkPathActive: async (key: string): Promise<{ active: boolean; reason: string }> => {
+    return await ipcRenderer.invoke('checkPathActive', key)
   }
 }
 

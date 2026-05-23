@@ -14,8 +14,18 @@
   let streamKey = ''
   let hlsUrl = ''
   let obsManualMode = false
+  let obsConnected = false; let obsConnReason = ''
+  let pathActive = false; let pathReason = ''
+  let statusTimer: ReturnType<typeof setInterval> | null = null
 
-  onDestroy(() => { disconnectOBS() })
+  async function refreshStatus(): Promise<void> {
+    const conn = await window.PcConnectApi.checkObsConnection()
+    obsConnected = conn.connected; obsConnReason = conn.reason
+    const path = await window.PcConnectApi.checkPathActive(streamKey)
+    pathActive = path.active; pathReason = path.reason
+  }
+
+  onDestroy(() => { disconnectOBS(); if (statusTimer) clearInterval(statusTimer) })
 
   const onStartClick = async (): Promise<void> => {
     try {
@@ -36,6 +46,7 @@
       }
 
       Swal.close()
+      refreshStatus(); statusTimer = setInterval(refreshStatus, 5000)
       sessionActive = true
       $navigationEnabled = false
       $isHosting = true
@@ -59,6 +70,7 @@
     try { await stopStream() } catch {}
     disconnectOBS()
     try { await window.PcConnectApi.stopStreaming() } catch {}
+    if (statusTimer) { clearInterval(statusTimer); statusTimer = null }
     publicUrl = ''
     streamKey = ''
     hlsUrl = ''
@@ -83,6 +95,11 @@
   <h1 class="title">{!sessionActive ? L.host_a_session() : '正在推流中'}</h1>
 
   {#if sessionActive}
+    <div class="box" style="display:flex;gap:20px;justify-content:center;flex-wrap:wrap;font-size:13px;margin-bottom:16px;">
+      <div><span>{obsConnected ? '🟢' : '⚪'}</span> OBS 连接{#if !obsConnected}<br><small>{obsConnReason}</small>{/if}</div>
+      <div><span>{pathActive ? '🟢' : '⚪'}</span> 流到达服务器{#if !pathActive}<br><small>{pathReason}</small>{/if}</div>
+    </div>
+
     <div class="box has-text-centered mb-5">
       <p class="heading">播放链接（发给朋友）</p>
       <p class="is-family-monospace is-size-7" style="word-break: break-all;">{hlsUrl}</p>
