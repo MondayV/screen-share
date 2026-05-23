@@ -32,7 +32,9 @@
   onDestroy(() => { disconnectOBS(); if (statusTimer) clearInterval(statusTimer) })
 
   const onStartClick = async (): Promise<void> => {
+    Swal.fire({ title: '正在检测环境...', text: '检查文件、端口、网络...', allowOutsideClick: false, didOpen: () => Swal.showLoading() })
     diagResults = await window.PcConnectApi.runDiagnostics()
+    Swal.close()
     if (diagResults.some(r => r.status === 'fail')) { showDiagnostics = true; return }
     try {
       Swal.fire({ title: '正在启动...', text: '启动串流服务', allowOutsideClick: false, didOpen: () => Swal.showLoading() })
