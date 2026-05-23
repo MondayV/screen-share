@@ -81,9 +81,6 @@ const PcConnectApi = {
   runDiagnostics: async (): Promise<{ name: string; status: string; message: string; suggestion: string }[]> => {
     return await ipcRenderer.invoke('runDiagnostics')
   },
-  addMediamtxPath: async (key: string): Promise<boolean> => {
-    return await ipcRenderer.invoke('addMediamtxPath', key)
-  },
   checkObsConnection: async (): Promise<{ connected: boolean; reason: string }> => {
     return await ipcRenderer.invoke('checkObsConnection')
   },

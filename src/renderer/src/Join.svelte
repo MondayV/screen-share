@@ -41,6 +41,7 @@
             Swal.fire({ icon: 'info', title: '主持人已结束推流', confirmButtonText: '关闭' }).then(() => resetView())
             return
           }
+          if (data.response?.code === 500) return // HLS not ready, silent retry
           if (!errorShown) {
             errorShown = true
             Swal.fire({ position: 'top-end', icon: 'error', title: '无法加载流', showConfirmButton: false, timer: 3000 })
