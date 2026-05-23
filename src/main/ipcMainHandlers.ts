@@ -240,13 +240,20 @@ export const ipcMainHandlersInit = (): void => {
     })
   })
   ipcMain.handle('checkPathActive', async (_e, streamKey: string) => {
-    try {
-      const res = await fetch('http://localhost:9997/v3/paths/list')
-      const data = await res.json() as any
-      const path = data.items?.find((p: any) => p.name === streamKey)
-      if (path?.sourceReady) return { active: true, reason: '' }
-      if (path) return { active: false, reason: '推流未到达，请检查 OBS 推流密钥是否填写正确' }
-      return { active: false, reason: '未检测到推流路径，请确认已在 OBS 中填入正确的串流密钥并开始推流' }
-    } catch { return { active: false, reason: '无法查询 MediaMTX 状态' } }
+    const http = require('http')
+    return new Promise((resolve) => {
+      const req = http.request({ hostname: 'localhost', port: 8888, path: `/${streamKey}/index.m3u8`, method: 'HEAD', timeout: 3000 }, (res: any) => {
+        if (res.statusCode >= 200 && res.statusCode < 400) {
+          resolve({ active: true, reason: '' })
+        } else if (res.statusCode === 404) {
+          resolve({ active: false, reason: '推流未到达，请检查 OBS 推流密钥是否填写正确' })
+        } else {
+          resolve({ active: false, reason: `推流异常 (${res.statusCode})` })
+        }
+      })
+      req.on('timeout', () => { req.destroy(); resolve({ active: false, reason: '查询超时，请确认 MediaMTX 已启动' }) })
+      req.on('error', () => { resolve({ active: false, reason: '无法查询推流状态，请确认 MediaMTX 已启动' }) })
+      req.end()
+    })
   })
 }
