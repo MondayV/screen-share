@@ -1,66 +1,83 @@
-# 指令：改用本地文件检测替代 MediaMTX API 查询
+# 指令：修复停止推流反馈 + 首次失败时引导设置 OBS 密码
 
 ## 问题
-MediaMTX API 端口 9997 未启用，无法通过 API 查询推流状态。
+1. 主持方停止推流后，“流到达服务器”状态灯未更新。
+2. 观众端停止推流后收到 404，反复重试无友好提示。
+3. 第一次开始共享时，如果 OBS WebSocket 密码缺失或错误，未引导用户进入设置页面。
 
-## 解决方案
-改为在主进程中检查本地 HLS 文件是否生成。当 OBS 推流成功后，MediaMTX 会在内存或临时目录生成 HLS 片段，我们可以通过检查 `http://localhost:8888/<streamKey>/index.m3u8` 的 HTTP 响应来判断推流是否到达。
+## 修复目标
+1. 停止推流后，主持方状态灯在 10 秒内变更为“推流已停止”。
+2. 观众端收到 404 后，停止重试并显示“主持人已结束推流”，提供返回按钮。
+3. 点击“开始共享”时，若 OBS 连接失败（特别是密码错误），弹出提示并直接打开设置页面，供用户填写/修改密码。
 
-## 修改步骤
+## 修改文件
+- `src/renderer/src/Host.svelte`
+- `src/renderer/src/Join.svelte`
+- `src/renderer/src/SettingsModal.svelte`（如果需要调整）
 
-### 1. 修改 `check-path-active` IPC handler
-- 文件：`src/main/index.ts`
-- 删除原有通过 API 查询的代码，替换为：
+## 实施步骤
 
-```ts
-ipcMain.handle('check-path-active', async (event, streamKey: string) => {
-  return new Promise((resolve) => {
-    const http = require('http');
-    const options = {
-      hostname: 'localhost',
-      port: 8888,
-      path: `/${streamKey}/index.m3u8`,
-      method: 'HEAD',
-      timeout: 3000
-    };
-    const req = http.request(options, (res) => {
-      if (res.statusCode >= 200 && res.statusCode < 400) {
-        resolve({ active: true, reason: '' });
-      } else if (res.statusCode === 404) {
-        resolve({ active: false, reason: '推流未到达，请检查 OBS 推流密钥是否填写正确' });
-      } else {
-        resolve({ active: false, reason: `推流异常 (${res.statusCode})，请检查 OBS 推流设置` });
-      }
-    });
-    req.on('timeout', () => {
-      req.destroy();
-      resolve({ active: false, reason: '查询超时，请确认 MediaMTX 已启动' });
-    });
-    req.on('error', (err) => {
-      resolve({ active: false, reason: '无法查询推流状态，请确认 MediaMTX 已启动' });
-    });
-    req.end();
-  });
-});
-2. 确认 Host.svelte 调用方式不变
-checkPathActive 仍然接收 streamKey 参数，调用方式无需修改。
+### 1. 主持方：增加推流状态检测的连续失败计数器
+- 在 `<script>` 中添加 `let pathFailCount = 0;`
+- 修改 `refreshAllStatus` 中的推流检测部分：
+  ```ts
+  const path = await window.electronAPI.checkPathActive(streamKey);
+  if (path.active) {
+    pathActive = true;
+    pathReason = '';
+    pathFailCount = 0;
+  } else {
+    pathFailCount++;
+    if (pathFailCount >= 2) {
+      pathActive = false;
+      pathReason = path.reason || '推流已停止';
+    }
+  }
+在 stopShare 中重置 pathFailCount = 0; pathActive = false;
 
-3. 构建并测试
+2. 观众端：处理 404 错误
+在 Join.svelte 的 HLS 错误监听中增加：
+
+ts
+if (data.type === Hls.ErrorTypes.NETWORK_ERROR && data.response?.code === 404) {
+  hls.destroy();
+  errorMessage = '主持人已结束推流。';
+  isStreamEnded = true;
+}
+在模板中添加结束提示和关闭按钮（复用已有的 resetView 函数）。
+
+3. 首次失败时引导设置密码
+在 Host.svelte 的 startShare 中，如果 OBS 连接或推流因认证失败而失败，执行：
+
+ts
+if (obsError && obsError.includes('身份验证失败') || obsError.includes('密码错误')) {
+  openSettings(); // 打开设置弹窗
+}
+openSettings 函数直接设置 showSettings = true，确保 SettingsModal 组件已引入并能接收 close 事件。
+
+如果 SettingsModal 中尚无 OBS 密码字段，请确保之前保留的 save-obs-password 和 get-obs-password IPC 以及设置界面中的密码输入框完整。
+
+4. 设置页面：保留 OBS 密码输入框
+确认 SettingsModal.svelte 中存在一个 type="password" 输入框，绑定 obsPasswordInput。
+
+确认 saveOBSPassword 和 loadOBSPassword 函数存在，并使用主进程提供的安全存储 IPC。
+
+5. 构建与测试
 清理：rm -rf release out
 
 构建：npm run build:win
 
-测试流程：
+测试：
 
-启动应用，点击“开始共享”，不推流时第三个状态灯应为灰色。
+主持人开始推流，状态灯变绿；停止推流，10 秒内状态灯变灰。
 
-在 OBS 中填入密钥并开始推流，5 秒内第三个状态灯应变为绿色。
+观众端停止推流后，显示结束提示并停止重试。
 
-观众端访问公网链接应能正常播放。
+首次使用或密码错误时，点击“开始共享”后弹出设置页面，用户可填入密码并保存。
 
 验收标准
-推流到达后，状态灯由灰变绿。
+停止推流后的反馈及时准确。
 
-未推流时显示明确原因（如“推流未到达，请检查密钥”）。
+观众端结束提示友好，不再反复报错。
 
-不再依赖 MediaMTX API，无需修改 MediaMTX 配置。
+密码错误时自动引导用户进入设置页面，无需手动寻找。

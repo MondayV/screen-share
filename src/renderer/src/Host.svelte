@@ -16,13 +16,15 @@
   let obsManualMode = false
   let obsConnected = false; let obsConnReason = ''
   let pathActive = false; let pathReason = ''
+  let pathFailCount = 0
   let statusTimer: ReturnType<typeof setInterval> | null = null
 
   async function refreshStatus(): Promise<void> {
     const conn = await window.PcConnectApi.checkObsConnection()
     obsConnected = conn.connected; obsConnReason = conn.reason
     const path = await window.PcConnectApi.checkPathActive(streamKey)
-    pathActive = path.active; pathReason = path.reason
+    if (path.active) { pathActive = true; pathReason = ''; pathFailCount = 0 }
+    else { pathFailCount++; if (pathFailCount >= 2) { pathActive = false; pathReason = path.reason } }
   }
 
   onDestroy(() => { disconnectOBS(); if (statusTimer) clearInterval(statusTimer) })
@@ -71,7 +73,7 @@
     disconnectOBS()
     try { await window.PcConnectApi.stopStreaming() } catch {}
     if (statusTimer) { clearInterval(statusTimer); statusTimer = null }
-    publicUrl = ''
+    pathFailCount = 0; pathActive = false
     streamKey = ''
     hlsUrl = ''
     sessionActive = false

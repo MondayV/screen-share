@@ -242,7 +242,7 @@ export const ipcMainHandlersInit = (): void => {
   ipcMain.handle('checkPathActive', async (_e, streamKey: string) => {
     const http = require('http')
     return new Promise((resolve) => {
-      const req = http.request({ hostname: 'localhost', port: 8888, path: `/${streamKey}/index.m3u8`, method: 'HEAD', timeout: 3000 }, (res: any) => {
+      const req = http.request({ hostname: 'localhost', port: 8888, path: `/${streamKey}/index.m3u8`, method: 'GET', timeout: 3000 }, (res: any) => {
         if (res.statusCode >= 200 && res.statusCode < 400) {
           resolve({ active: true, reason: '' })
         } else if (res.statusCode === 404) {

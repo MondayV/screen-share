@@ -36,6 +36,11 @@
       })
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
+          if (data.response?.code === 404) {
+            hls?.destroy(); hls = null
+            Swal.fire({ icon: 'info', title: '主持人已结束推流', confirmButtonText: '关闭' }).then(() => resetView())
+            return
+          }
           if (!errorShown) {
             errorShown = true
             Swal.fire({ position: 'top-end', icon: 'error', title: '无法加载流', showConfirmButton: false, timer: 3000 })
