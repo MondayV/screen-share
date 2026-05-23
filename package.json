@@ -1,6 +1,6 @@
 {
   "name": "pc-connect",
-  "version": "2.2.9",
+  "version": "2.2.10",
   "description": "PC Connect - 屏幕共享工具",
   "main": "./out/main/index.js",
   "author": {
