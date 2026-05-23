@@ -77,6 +77,9 @@ const PcConnectApi = {
   },
   getObsPassword: async (): Promise<string> => {
     return await ipcRenderer.invoke('get-obs-password')
+  },
+  runDiagnostics: async (): Promise<{ name: string; status: string; message: string; suggestion: string }[]> => {
+    return await ipcRenderer.invoke('runDiagnostics')
   }
 }
 

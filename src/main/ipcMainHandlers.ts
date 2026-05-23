@@ -160,4 +160,63 @@ export const ipcMainHandlersInit = (): void => {
     if (mediamtxProcess) { mediamtxProcess.kill(); mediamtxProcess = null }
     if (cloudflaredProcess) { cloudflaredProcess.kill(); cloudflaredProcess = null }
   })
+  ipcMain.handle('runDiagnostics', async () => {
+    const results: { name: string; status: string; message: string; suggestion: string }[] = []
+    const pass = (name: string) => results.push({ name, status: 'pass', message: '正常', suggestion: '' })
+    const fail = (name: string, msg: string, sug: string) => results.push({ name, status: 'fail', message: msg, suggestion: sug })
+
+    // 1. Mediamtx file check
+    const mtPath = getMediaMTXPath()
+    if (fs.existsSync(mtPath)) pass('MediaMTX 文件存在')
+    else fail('MediaMTX 文件存在', `未找到 ${mtPath}`, '请重新安装 PCConnect')
+
+    // 2. Cloudflared file check
+    const cfPath = getCloudflaredPath()
+    if (fs.existsSync(cfPath)) pass('Cloudflared 文件存在')
+    else fail('Cloudflared 文件存在', `未找到 ${cfPath}`, '请重新安装 PCConnect')
+
+    // 3. Cloudflared --version test
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const proc = spawn(cfPath, ['--version'], { windowsHide: true })
+        const t = setTimeout(() => { proc.kill(); reject(new Error('timeout')) }, 5000)
+        proc.on('close', (code) => { clearTimeout(t); code === 0 ? resolve() : reject(new Error(`exit ${code}`)) })
+        proc.on('error', reject)
+      })
+      pass('Cloudflared 可执行')
+    } catch { fail('Cloudflared 可执行', '无法运行 cloudflared --version', '可能缺少 VC++ 运行库，下载: https://aka.ms/vs/17/release/vc_redist.x64.exe') }
+
+    // 4. Port 8888 check
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const s = require('net').createServer()
+        s.once('error', reject); s.once('listening', () => { s.close(); resolve() })
+        s.listen(8888, '127.0.0.1')
+      })
+      pass('端口 8888 空闲')
+    } catch { fail('端口 8888', '端口 8888 已被占用', '请关闭占用 8888 端口的程序后重试') }
+
+    // 5. Port 1935 check
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const s = require('net').createServer()
+        s.once('error', reject); s.once('listening', () => { s.close(); resolve() })
+        s.listen(1935, '127.0.0.1')
+      })
+      pass('端口 1935 空闲')
+    } catch { fail('端口 1935', '端口 1935 已被占用', '请关闭占用 1935 端口的程序后重试') }
+
+    // 6. Network reachability
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const s = require('net').createConnection({ host: 'trycloudflare.com', port: 443 })
+        s.on('connect', () => { s.end(); resolve() })
+        s.on('error', reject)
+        setTimeout(() => { s.destroy(); reject(new Error('timeout')) }, 5000)
+      })
+      pass('出站网络连接')
+    } catch { fail('出站网络', '无法连接 trycloudflare.com', '请检查网络连接或关闭代理/VPN') }
+
+    return results
+  })
 }
