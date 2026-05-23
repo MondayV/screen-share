@@ -160,6 +160,16 @@ export const ipcMainHandlersInit = (): void => {
     if (mediamtxProcess) { mediamtxProcess.kill(); mediamtxProcess = null }
     if (cloudflaredProcess) { cloudflaredProcess.kill(); cloudflaredProcess = null }
   })
+  ipcMain.handle('addMediamtxPath', async (_e, streamKey: string) => {
+    try {
+      await fetch('http://localhost:9997/v3/config/paths/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: streamKey, source: 'publisher' })
+      })
+      return true
+    } catch { return false }
+  })
   ipcMain.handle('runDiagnostics', async () => {
     const results: { name: string; status: string; message: string; suggestion: string }[] = []
     const pass = (name: string) => results.push({ name, status: 'pass', message: '正常', suggestion: '' })

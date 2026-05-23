@@ -14,28 +14,18 @@
   let streamKey = ''
   let hlsUrl = ''
   let obsManualMode = false
-  let showDiagnostics = false
-  let diagResults: { name: string; status: string; message: string; suggestion: string }[] = []
 
   onDestroy(() => { disconnectOBS() })
 
-  async function runDiagnostics(): Promise<boolean> {
-    diagResults = await window.PcConnectApi.runDiagnostics()
-    showDiagnostics = true
-    return diagResults.every(r => r.status === 'pass')
-  }
-
   const onStartClick = async (): Promise<void> => {
     try {
-      const diagOk = await runDiagnostics()
-      if (!diagOk) return
-
       Swal.fire({ title: '正在启动...', text: '启动串流服务', allowOutsideClick: false, didOpen: () => Swal.showLoading() })
 
       const result = await window.PcConnectApi.startStreaming()
       publicUrl = result.publicUrl
       streamKey = result.streamKey
       hlsUrl = `${publicUrl}/${streamKey}/index.m3u8`
+      await window.PcConnectApi.addMediamtxPath(streamKey)
 
       try {
         await connectToOBS()
@@ -133,20 +123,6 @@
         <span class="icon"><i class="fas fa-stop"></i></span>
         <span>结束推流</span>
       </button>
-    </div>
-  {:else if showDiagnostics}
-    <div class="box">
-      <p class="heading">环境诊断结果</p>
-      {#each diagResults as item}
-        <div style="padding:4px 0;font-size:14px;">
-          <span>{item.status === 'pass' ? '✅' : '❌'} {item.name}</span>
-          {#if item.status === 'fail'}<p style="color:var(--accent-secondary);font-size:12px;margin:2px 0 0 20px;">{item.suggestion}</p>{/if}
-        </div>
-      {/each}
-      <div style="margin-top:12px;display:flex;gap:8px;">
-        <button class="button is-link" on:click={() => { showDiagnostics = false; onStartClick() }}>重新检测</button>
-        <button class="button is-light" on:click={() => showDiagnostics = false}>关闭</button>
-      </div>
     </div>
   {:else}
     <div class="has-text-centered">
