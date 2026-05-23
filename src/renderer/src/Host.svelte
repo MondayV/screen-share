@@ -18,6 +18,8 @@
   let pathActive = false; let pathReason = ''
   let pathFailCount = 0
   let statusTimer: ReturnType<typeof setInterval> | null = null
+  let showDiagnostics = false
+  let diagResults: { name: string; status: string; message: string; suggestion: string }[] = []
 
   async function refreshStatus(): Promise<void> {
     const conn = await window.PcConnectApi.checkObsConnection()
@@ -30,6 +32,8 @@
   onDestroy(() => { disconnectOBS(); if (statusTimer) clearInterval(statusTimer) })
 
   const onStartClick = async (): Promise<void> => {
+    diagResults = await window.PcConnectApi.runDiagnostics()
+    if (diagResults.some(r => r.status === 'fail')) { showDiagnostics = true; return }
     try {
       Swal.fire({ title: '正在启动...', text: '启动串流服务', allowOutsideClick: false, didOpen: () => Swal.showLoading() })
 
@@ -142,6 +146,20 @@
         <span class="icon"><i class="fas fa-stop"></i></span>
         <span>结束推流</span>
       </button>
+    </div>
+  {:else if showDiagnostics}
+    <div class="box">
+      <p class="heading">环境诊断结果</p>
+      {#each diagResults as item}
+        <div style="padding:3px 0;font-size:13px;">
+          <span>{item.status === 'pass' ? '✅' : '❌'} {item.name}</span>
+          {#if item.status === 'fail'}<p style="color:var(--accent-secondary);font-size:11px;margin:1px 0 0 18px;">{item.suggestion}</p>{/if}
+        </div>
+      {/each}
+      <div style="margin-top:10px;display:flex;gap:8px;">
+        <button class="button is-link is-small" on:click={() => { showDiagnostics = false; onStartClick() }}>重新检测</button>
+        <button class="button is-light is-small" on:click={() => showDiagnostics = false}>关闭</button>
+      </div>
     </div>
   {:else}
     <div class="has-text-centered">
