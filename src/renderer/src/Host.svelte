@@ -44,7 +44,6 @@
       publicUrl = result.publicUrl
       streamKey = result.streamKey
       hlsUrl = `${publicUrl}/${streamKey}/index.m3u8`
-      await window.PcConnectApi.addMediamtxPath(streamKey)
       try { await connectToOBS(); await startStream(); obsManualMode = false } catch { obsManualMode = true }
       Swal.close()
       refreshStatus(); statusTimer = setInterval(refreshStatus, 5000)
