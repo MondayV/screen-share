@@ -16,6 +16,7 @@ extraResources:
     to: "tools"
     filter:
       - "*.exe"
+      - "*.yml"
 win:
   executableName: PCConnect
   icon: build/icon.ico
