@@ -2,7 +2,7 @@ import type { SettingsData } from './stateKeeper'
 import { app, BrowserWindow, ipcMain, screen } from 'electron'
 import { createCursorsWindow } from './cursors'
 import { settingsKeeper } from './stateKeeper'
-import { spawn, ChildProcess } from 'child_process'
+import { spawn, execSync, ChildProcess } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 
@@ -32,9 +32,21 @@ function getCloudflaredPath(): string {
 let mediamtxProcess: ChildProcess | null = null
 let cloudflaredProcess: ChildProcess | null = null
 
+function sendLog(msg: string): void {
+  const wins = BrowserWindow.getAllWindows()
+  if (wins.length > 0) wins[0].webContents.send('log-message', msg)
+}
+
+function killProcess(p: ChildProcess | null, name: string): void {
+  if (!p) return
+  try { execSync(`taskkill /PID ${p.pid} /F /T`, { stdio: 'ignore' }) } catch {}
+  try { p.kill() } catch {}
+  console.log(`[Cleanup] ${name} 已终止`)
+}
+
 export function stopAllProcesses(): void {
-  if (mediamtxProcess) { mediamtxProcess.kill(); mediamtxProcess = null }
-  if (cloudflaredProcess) { cloudflaredProcess.kill(); cloudflaredProcess = null }
+  killProcess(mediamtxProcess, 'MediaMTX'); mediamtxProcess = null
+  killProcess(cloudflaredProcess, 'Cloudflared'); cloudflaredProcess = null
 }
 
 export const ipcMainHandlersInit = (): void => {
@@ -92,8 +104,8 @@ export const ipcMainHandlersInit = (): void => {
   ipcMain.handle('startStreaming', async (): Promise<{ publicUrl: string; streamKey: string }> => {
     if (!mediamtxProcess) {
       mediamtxProcess = spawn(getMediaMTXPath(), [], { cwd: path.dirname(getMediaMTXPath()) })
-      mediamtxProcess.stderr?.on('data', (d) => console.log('[MediaMTX]', d.toString().trim()))
-      mediamtxProcess.stdout?.on('data', (d) => console.log('[MediaMTX]', d.toString().trim()))
+      mediamtxProcess.stderr?.on('data', (d) => { const m = d.toString().trim(); console.log('[MediaMTX]', m); sendLog(`[MediaMTX] ${m}`) })
+      mediamtxProcess.stdout?.on('data', (d) => { const m = d.toString().trim(); console.log('[MediaMTX]', m); sendLog(`[MediaMTX] ${m}`) })
       const timeout = setTimeout(() => {
         mediamtxProcess?.kill()
         throw new Error('MediaMTX 启动超时（30秒），请重试或重启应用')
@@ -141,14 +153,14 @@ export const ipcMainHandlersInit = (): void => {
       if (cloudflaredProcess) { cloudflaredProcess.kill(); cloudflaredProcess = null }
       cloudflaredProcess = spawn(cfPath, ['tunnel', '--url', 'http://localhost:8888', '--no-autoupdate'], { env, windowsHide: true })
       let buffer = ''
-      cloudflaredProcess.stderr?.on('data', (d) => { buffer += d.toString(); console.log('[Cloudflared]', d.toString().trim()) })
-      cloudflaredProcess.stdout?.on('data', (d) => { buffer += d.toString(); console.log('[Cloudflared]', d.toString().trim()) })
+      cloudflaredProcess.stderr?.on('data', (d) => { const m = d.toString(); buffer += m; console.log('[Cloudflared]', m.trim()); sendLog(`[Cloudflared] ${m.trim()}`) })
+      cloudflaredProcess.stdout?.on('data', (d) => { const m = d.toString(); buffer += m; console.log('[Cloudflared]', m.trim()); sendLog(`[Cloudflared] ${m.trim()}`) })
       return new Promise<string>((resolve, reject) => {
         const done = (url: string) => { clearTimeout(timer); resolve(url) }
         const fail = (err: Error) => { clearTimeout(timer); reject(err) }
         const check = (data: string) => {
           const m = data.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/)
-          if (m) done(m[0])
+          if (m) { sendLog(`[Cloudflared] 隧道已建立: ${m[0]}`); done(m[0]) }
         }
         cloudflaredProcess!.stderr?.on('data', (d) => check(d.toString()))
         cloudflaredProcess!.stdout?.on('data', (d) => check(d.toString()))

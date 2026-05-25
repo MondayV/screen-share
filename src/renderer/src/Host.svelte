@@ -20,6 +20,11 @@
   let statusTimer: ReturnType<typeof setInterval> | null = null
   let diagRunning = false
   let diagResults: { name: string; status: string; message: string; suggestion: string }[] = []
+  let showLogs = false
+  let logs: string[] = []
+  let removeLogListener: (() => void) | null = null
+
+  onDestroy(() => { if (removeLogListener) removeLogListener() })
 
   async function refreshStatus(): Promise<void> {
     const conn = await window.PcConnectApi.checkObsConnection()
@@ -47,6 +52,7 @@
       try { await connectToOBS(); await startStream(); obsManualMode = false } catch { obsManualMode = true }
       Swal.close()
       refreshStatus(); statusTimer = setInterval(refreshStatus, 5000)
+      removeLogListener = window.PcConnectApi.onLogMessage((msg) => { logs = [...logs.slice(-49), msg] })
       sessionActive = true
       $navigationEnabled = false; $isHosting = true
     } catch (e) {
@@ -99,7 +105,13 @@
     </div>
     <div class="has-text-centered mt-5">
       <button class="button is-danger is-large" on:click={onStopClick}><span class="icon"><i class="fas fa-stop"></i></span><span>结束推流</span></button>
+      <button class="button is-small is-light ml-3" on:click={() => showLogs = !showLogs}>{showLogs ? '隐藏日志' : '显示日志'}</button>
     </div>
+    {#if showLogs && logs.length > 0}
+      <div style="background:#0a0a1a;color:#00ff41;font-family:var(--font-mono);font-size:11px;padding:8px;border-radius:4px;max-height:200px;overflow-y:auto;margin-top:8px;white-space:pre-wrap;word-break:break-all;">
+        {#each logs as log}<div>{log}</div>{/each}
+      </div>
+    {/if}
   {:else}
     <div class="has-text-centered">
       <button class="button is-link is-large" on:click={onStartClick}>

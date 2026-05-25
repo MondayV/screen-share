@@ -86,6 +86,11 @@ const PcConnectApi = {
   },
   checkPathActive: async (key: string): Promise<{ active: boolean; reason: string }> => {
     return await ipcRenderer.invoke('checkPathActive', key)
+  },
+  onLogMessage: (cb: (msg: string) => void): (() => void) => {
+    const handler = (_: any, msg: string) => cb(msg)
+    ipcRenderer.on('log-message', handler)
+    return () => ipcRenderer.removeListener('log-message', handler)
   }
 }
 
