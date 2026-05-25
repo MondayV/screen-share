@@ -1,158 +1,119 @@
-# 指令：集成 OBS WebSocket，实现一键遥控推流
+# 指令：最终发布版本（安装版通过测试），更新所有文档
+
+## 当前状态
+- 安装版双开测试通过，OBS 推流正常，观众端可观看。
+- 问题根源：打包后缺少 `mediamtx.yml` 且启动命令错误，已修复。
+- 代码已提交，但尚未打标签和发布新版本。
 
 ## 目标
-通过 OBS WebSocket 协议，让应用直接控制 OBS Studio 的推流行为，实现真正的“一键共享”：
-- 点击“开始共享”后，自动启动 OBS 推流（无需用户手动操作 OBS）
-- 停止共享时自动停止 OBS 推流
-- 保持现有 MediaMTX + cloudflared 架构不变
+1. 升级版本号至 `2.3.0`（标志着推流路径问题彻底解决，安装版可正式分发）。
+2. 更新 `README.md`，补充使用教程、常见问题和最新变化。
+3. 更新 `CHANGELOG.md`（如果存在）或 Release 描述，记录本次修复内容。
+4. 提交所有更改，打标签 `v2.3.0`，推送到 GitHub。
+5. 创建 GitHub Release 并上传生成的安装包。
 
-## 前置条件
-- OBS Studio 已安装并启用 obs-websocket 插件（OBS 28+ 已内置，无需额外安装）
-- 在 OBS 中：**工具 → obs-websocket 设置**，确保启用 WebSocket 服务器，默认端口 4455，**记下密码**（或设置为无密码，仅本地使用）
+## 执行步骤（AI 严格按序完成）
 
-## 修改步骤
+### 1. 升级版本号
+- 修改 `package.json` 中的 `version` 字段为 `"2.3.0"`。
+- 运行 `npm install` 同步 `package-lock.json`（可选，若未自动更新可忽略）。
 
-### 1. 安装 obs-websocket-js 库
-在项目根目录执行：
-```bash
-npm install obs-websocket-js
-2. 创建 OBS 控制模块
-新建 src/renderer/src/lib/obs-controller.ts，内容如下：
+### 2. 更新 README.md
+- 用以下内容**覆盖**现有的 `README.md`（注意使用项目实际名称和链接）：
 
-ts
-import OBSWebSocket from 'obs-websocket-js';
+```markdown
+# PCConnect - 零门槛屏幕共享
 
-let obs: OBSWebSocket | null = null;
+一款基于 OBS + MediaMTX + Cloudflare 免费隧道的屏幕共享工具，**主持人无需注册、无需域名、无需 API Key**，观众只需粘贴链接即可观看。
 
-// 连接到 OBS WebSocket 服务器
-export async function connectToOBS(): Promise<void> {
-  obs = new OBSWebSocket();
-  try {
-    await obs.connect('ws://localhost:4455', '你的密码'); // 如无密码，第二个参数留空 ''
-    console.log('[OBS] 已连接');
-  } catch (err) {
-    console.error('[OBS] 连接失败:', err);
-    throw new Error('无法连接到 OBS，请确认 OBS 已启动并开启 WebSocket 服务');
-  }
-}
+## ✨ 功能特点
+- 🖥️ **屏幕共享**：利用 OBS 强大的采集能力，支持整个屏幕、窗口、游戏画面。
+- 🔗 **零门槛分享**：自动生成公网播放链接，发给朋友即可观看，无需任何网络配置。
+- 💰 **永久免费**：基于开源组件，无次数限制，无月费。
+- 🎨 **多款皮肤**：内置深色和赛博朋克皮肤，一键切换。
 
-// 获取当前推流状态
-export async function getStreamStatus(): Promise<boolean> {
-  if (!obs) return false;
-  const { outputActive } = await obs.call('GetStreamStatus');
-  return outputActive;
-}
+## 📥 安装
+1. 下载最新安装包：从 [GitHub Releases](https://github.com/MondayV/screen-share/releases) 下载 `PCConnect Setup x.x.x.exe`。
+2. 双击安装，勾选“创建桌面快捷方式”。
+3. 安装完成后，桌面会出现 `PCConnect` 图标。
 
-// 开始推流
-export async function startStream(): Promise<void> {
-  if (!obs) throw new Error('OBS 未连接');
-  await obs.call('StartStream');
-  console.log('[OBS] 推流已开始');
-}
+## 🚀 使用教程
 
-// 停止推流
-export async function stopStream(): Promise<void> {
-  if (!obs) return;
-  await obs.call('StopStream');
-  console.log('[OBS] 推流已停止');
-}
+### 作为主持人（共享你的屏幕）
+1. **安装 OBS Studio**：从 [obsproject.com](https://obsproject.com/) 下载并安装 OBS。
+2. **启动 PCConnect**，点击 **“开始共享”**。
+3. 应用会自动在后台启动 MediaMTX 和 cloudflared 隧道，并显示：
+   - **OBS 服务器地址**：`rtmp://localhost:1935`
+   - **OBS 串流密钥**：`随机6位密钥`
+   - **公网播放链接**：`https://xxx.trycloudflare.com/密钥/index.m3u8`
+4. **配置 OBS**：
+   - 打开 OBS，点击 **设置 → 推流**。
+   - 服务选择 `自定义...`，填入上述服务器和密钥。
+   - 在来源中添加要共享的内容（显示器采集 / 窗口采集 / 游戏采集）。
+5. 点击 OBS 的 **“开始推流”**。
+6. 将 **公网播放链接** 复制并发送给朋友。
+7. 结束时，在 OBS 中点击“停止推流”，并在 PCConnect 中点击“停止共享”。
 
-// 断开连接
-export function disconnectOBS(): void {
-  if (obs) {
-    obs.disconnect();
-    obs = null;
-    console.log('[OBS] 已断开');
-  }
-}
-3. 改造主持方界面 (Host.svelte)
-在 <script> 中引入 OBS 控制模块：
+### 作为观众（观看朋友的屏幕）
+1. 启动 PCConnect，点击 **“观看”** 选项卡。
+2. 粘贴主持人分享的 **播放链接**，点击 **“观看”** 按钮。
+3. 稍等片刻，应用内将播放共享画面（延迟约 1-5 秒）。
 
-ts
-import { connectToOBS, startStream, stopStream, disconnectOBS } from './lib/obs-controller';
-修改 startShare 函数，在获取公网链接后自动启动 OBS 推流：
+### OBS 使用注意事项
+- 以管理员身份运行 OBS 可避免部分游戏黑屏或无法捕获的问题。
+- 如果共享游戏，推荐使用“游戏采集”模式，性能更优。
+- 网络不稳定时可降低 OBS 输出比特率（设置 → 输出 → 视频比特率，建议 2000-4000 Kbps）。
 
-ts
-async function startShare() {
-  try {
-    // 1. 连接 OBS
-    await connectToOBS();
-    
-    // 2. 启动 MediaMTX + cloudflared（原有逻辑）
-    await window.electronAPI.startMediamtx();
-    const domain = await window.electronAPI.startCloudflared();
-    streamKey = Math.random().toString(36).substring(2, 8).toUpperCase();
-    publicUrl = `https://${domain}/${streamKey}/index.m3u8`;
-    
-    // 3. 设置 OBS 推流信息（通过 WebSocket）
-    // 注意：这里假设用户已在 OBS 中配置好推流地址为 rtmp://localhost:1935
-    // 如果未配置，可引导用户手动设置，或通过 obs-websocket 动态修改（更复杂）
-    
-    // 4. 启动 OBS 推流
-    await startStream();
-    
-    isStreaming = true;
-  } catch (err) {
-    console.error('启动失败:', err);
-    alert('启动失败，请检查 OBS 是否已启动并开启 WebSocket 服务');
-  }
-}
-修改 stopShare 函数：
+## 🎨 皮肤切换
+在 PCConnect 设置中，你可以选择 **深色** 或 **赛博朋克** 两款皮肤，一键切换，立刻生效。
 
-ts
-async function stopShare() {
-  try {
-    await stopStream();          // 停止 OBS 推流
-  } catch {}
-  disconnectOBS();               // 断开 OBS 连接
-  window.electronAPI.stopAll();  // 停止 MediaMTX 和 cloudflared
-  isStreaming = false;
-  streamKey = '';
-  publicUrl = '';
-}
-在组件销毁时断开 OBS：
+## 🔄 更新日志
+### v2.3.0 (2026-05-25)
+- 修复安装包缺失 `mediamtx.yml` 导致推流路径拒绝的问题
+- 修正 MediaMTX 启动参数，移除无效的 `-c` 前缀
+- 修复观众端反复 500 错误
+- 优化推流状态指示灯，实时反馈 OBS 连接和推流状态
+- 增加观众端停止推流后的友好提示
 
-ts
-import { onDestroy } from 'svelte';
-onDestroy(() => {
-  disconnectOBS();
-});
-4. 添加 OBS 连接状态提示（可选）
-在 UI 中增加一个状态指示：
+## 📜 开源协议
+MIT License
+3. 更新 CHANGELOG.md（如果存在）
+若项目根目录存在 CHANGELOG.md，则在其顶部插入 v2.3.0 的条目，内容与上述更新日志一致。
 
-ts
-let obsConnected = false;
-// 在 connectToOBS 成功后设置 obsConnected = true
-模板中添加：
+若不存在，可选择不创建，而是在 GitHub Release 的描述中写明。
 
-html
-{#if isStreaming}
-  <div class="status">🟢 OBS 已连接，正在推流</div>
-{/if}
-5. 配置 OBS 推流地址（首次引导）
-由于应用无法直接通过 WebSocket 修改 OBS 的推流服务器和密钥，需要在首次使用时引导用户手动设置一次：
+4. 提交所有更改
+bash
+git add -A
+git commit -m "release: v2.3.0 - 修复安装版推流问题，正式可用，更新文档"
+5. 打标签并推送
+bash
+git tag v2.3.0 -m "v2.3.0 正式稳定版"
+git push origin main --tags
+6. 重新构建安装包
+bash
+rm -rf release out
+npm run build:win
+7. 创建 GitHub Release 并上传安装包
+bash
+gh release create v2.3.0 \
+  --title "v2.3.0 正式稳定版 - 推流路径修复" \
+  --notes "🎉 经过多轮测试，安装版已可正常使用！
 
-显示文本：“首次使用请先在 OBS 中设置：推流服务 → 自定义，服务器 rtmp://localhost:1935，串流密钥任意（应用将自动同步）”
+✨ 新特性
+- 零门槛屏幕共享：主持人无需注册、无需域名、无需 API Key
+- 观众粘贴链接即可观看，无需任何网络配置
+- 内置深色与赛博朋克皮肤，一键切换
+- 实时推流状态指示，一目了然
 
-或者，应用在启动时检查 OBS 的 StreamSettings，如果未配置则弹出引导对话框。
+🐛 修复
+- 修复安装包缺失 mediamtx.yml 导致推流路径拒绝 (500 错误)
+- 修正 MediaMTX 启动参数，确保配置文件正确加载
+- 观众端停止推流后友好提示，不再反复重试
 
-高级选项：可以使用 obs-websocket 的 SetStreamSettings 方法动态修改推流地址，但实现较复杂，可作为后续优化。
+📥 下载：PCConnect Setup 2.3.0.exe" \
+  release/PCConnect\ Setup\ 2.3.0.exe
+8. 输出结果
+显示 Release 链接：https://github.com/MondayV/screen-share/releases/tag/v2.3.0
 
-6. 重新构建并测试
-清理构建：rm -rf release out
-
-重新打包：npm run build:win
-
-测试流程：
-
-启动 OBS，确保 WebSocket 已启用
-启动应用，点击“开始共享”
-应用自动连接 OBS → 启动推流 → 生成公网链接
-观众端输入链接观看
-主持人点击“停止共享” → OBS 推流停止 → 链接失效
-7. 验收标准
-主持人点击“开始共享”后，OBS 自动开始推流，无需手动操作 OBS
-
-停止共享时 OBS 自动停止推流
-
-如果 OBS 未启动，应用给出明确提示
+提示用户：README 已更新，安装版可正式分享给朋友使用。
