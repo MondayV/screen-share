@@ -26,6 +26,8 @@ nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: PC Connect
   uninstallDisplayName: PC Connect
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
   createDesktopShortcut: always
   oneClick: false
   perMachine: true

@@ -1,6 +1,6 @@
 {
   "name": "pc-connect",
-  "version": "2.3.3",
+  "version": "2.3.4",
   "description": "PC Connect - 屏幕共享工具",
   "main": "./out/main/index.js",
   "author": {
@@ -35,8 +35,10 @@
     "electron": "^31.0.2",
     "electron-builder": "^26.8.1",
     "electron-vite": "^2.3.0",
+    "sharp": "^0.34.5",
     "svelte": "4.2.19",
     "svelte-awesome-color-picker": "3.1.4",
+    "to-ico": "^1.1.5",
     "typescript": "^5.5.2",
     "vite": "^5.3.1"
   }
