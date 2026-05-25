@@ -16,13 +16,19 @@
   } from './stores'
   import { theme } from './theme'
   import { getDataFromPcConnectUrl } from './Utils'
+  import Swal from 'sweetalert2'
   const activeView = useActiveView()
   theme // keep reference so subscription runs
+
   const participantUrl = useParticipantUrl()
   const hostUrl = useHostUrl()
   const isHosting = useIsHosting()
   useNavigationEnabled()
   useIsWatching()
+  window.PcConnectApi.onConfirmExit(async () => {
+    const r = await Swal.fire({ title: '退出确认', text: '正在共享中，确定要退出吗？观众将断开连接。', icon: 'warning', showCancelButton: true, confirmButtonText: '确定退出', cancelButtonText: '取消' })
+    if (r.isConfirmed) window.PcConnectApi.forceClose()
+  })
   window.onmessage = async (evt: MessageEvent): Promise<void> => {
     const { data } = evt
     if (data.type !== 'openPcConnectURL') return

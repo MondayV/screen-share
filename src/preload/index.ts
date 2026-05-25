@@ -91,6 +91,12 @@ const PcConnectApi = {
     const handler = (_: any, msg: string) => cb(msg)
     ipcRenderer.on('log-message', handler)
     return () => ipcRenderer.removeListener('log-message', handler)
+  },
+  onConfirmExit: (cb: () => void): void => {
+    ipcRenderer.on('confirm-exit', () => cb())
+  },
+  forceClose: (): void => {
+    ipcRenderer.send('force-close')
   }
 }
 

@@ -20,13 +20,11 @@
   let isIceServersValid = true
   let modalSuccessIsActive = false
   let modalFailureIsActive = false
-  let isMicrophoneEnabledOnConnect = true
   let obsPassword = ''
 
   $: colorValue, checkColor()
   $: usernameValue, checkUsername()
   $: iceServersValue, checkIceServers()
-  $: isMicrophoneEnabledOnConnect
   $: obsPassword, saveOBSPassword()
 
   const checkIceServers = (): void => {
@@ -65,7 +63,7 @@
         username: usernameValue,
         color: colorValue,
         language,
-        isMicrophoneEnabledOnConnect,
+        isMicrophoneEnabledOnConnect: true,
         iceServers: iceServersValue.split('\n').map((srv) => JSON.parse(srv))
       })
       modalSuccessIsActive = true
@@ -88,7 +86,6 @@
     usernameValue = settings.username
     colorValue = settings.color
     language = settings.language
-    isMicrophoneEnabledOnConnect = settings.isMicrophoneEnabledOnConnect
     iceServersValue = settings.iceServers.map((srv) => JSON.stringify(srv)).join('\n')
     obsPassword = await window.PcConnectApi.getObsPassword()
   })
@@ -177,22 +174,6 @@
             {/each}
           </select>
         </div>
-      </div>
-    </div>
-
-    <h2>{L.media()}</h2>
-
-    <div class="field">
-      <div class="control">
-        <label class="checkbox" for="microphone_active_on_connect">
-          <input
-            bind:checked={isMicrophoneEnabledOnConnect}
-            class="checkbox"
-            type="checkbox"
-            id="microphone_active_on_connect"
-          />
-          {L.is_microphone_active_on_connect()}
-        </label>
       </div>
     </div>
 

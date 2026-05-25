@@ -44,7 +44,15 @@
           if (data.response?.code === 500) return // HLS not ready, silent retry
           if (!errorShown) {
             errorShown = true
-            Swal.fire({ position: 'top-end', icon: 'error', title: '无法加载流', showConfirmButton: false, timer: 3000 })
+            Swal.fire({
+              icon: 'warning', title: '无法加载流',
+              text: '主持人可能尚未开始推流，可稍后重试',
+              showConfirmButton: true, confirmButtonText: '手动重试',
+              showCancelButton: true, cancelButtonText: '关闭'
+            }).then((r) => {
+              if (r.isConfirmed) { errorShown = false; hls?.destroy(); hls = null; startPlayback(playUrl) }
+              else resetView()
+            })
           }
         }
       })

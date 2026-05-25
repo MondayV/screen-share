@@ -133,6 +133,14 @@ app.whenReady().then(async () => {
   })
 
   await createWindow()
+  MAIN_WINDOW.on('close', (e) => {
+    e.preventDefault()
+    MAIN_WINDOW.webContents.send('confirm-exit')
+  })
+  ipcMain.on('force-close', () => {
+    MAIN_WINDOW.removeAllListeners('close')
+    MAIN_WINDOW.close()
+  })
   const coldStartUrl = process.argv.find((arg) => arg.startsWith(CUSTOM_PROTOCOL + '://'))
   if (coldStartUrl) {
     sendOpenPcConnectUrlToRenderer(coldStartUrl)
