@@ -5,7 +5,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import fs from 'fs'
 import icon from '../../resources/icon.png?asset'
 import { windowStateKeeper } from './stateKeeper'
-import { ipcMainHandlersInit } from './ipcMainHandlers'
+import { ipcMainHandlersInit, stopAllProcesses } from './ipcMainHandlers'
 import { isInProductionMode } from './utils'
 
 const CUSTOM_PROTOCOL = 'pcconnect'
@@ -142,6 +142,8 @@ app.whenReady().then(async () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
+
+app.on('before-quit', () => { stopAllProcesses() })
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

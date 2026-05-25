@@ -29,12 +29,18 @@ function getCloudflaredPath(): string {
   return 'cloudflared.exe'
 }
 
+let mediamtxProcess: ChildProcess | null = null
+let cloudflaredProcess: ChildProcess | null = null
+
+export function stopAllProcesses(): void {
+  if (mediamtxProcess) { mediamtxProcess.kill(); mediamtxProcess = null }
+  if (cloudflaredProcess) { cloudflaredProcess.kill(); cloudflaredProcess = null }
+}
+
 export const ipcMainHandlersInit = (): void => {
   const availableDimensions = screen.getPrimaryDisplay().workAreaSize
   let remoteCursorsWindow: BrowserWindow | null = null
   let remoteCursorsActive = false
-  let mediamtxProcess: ChildProcess | null = null
-  let cloudflaredProcess: ChildProcess | null = null
 
   ipcMain.handle('toggleRemoteCursors', async (_, state) => {
     remoteCursorsActive = state
@@ -157,8 +163,7 @@ export const ipcMainHandlersInit = (): void => {
     return { publicUrl, streamKey }
   })
   ipcMain.handle('stopStreaming', async (): Promise<void> => {
-    if (mediamtxProcess) { mediamtxProcess.kill(); mediamtxProcess = null }
-    if (cloudflaredProcess) { cloudflaredProcess.kill(); cloudflaredProcess = null }
+    stopAllProcesses()
   })
   ipcMain.handle('runDiagnostics', async () => {
     const results: { name: string; status: string; message: string; suggestion: string }[] = []

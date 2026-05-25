@@ -82,8 +82,9 @@ export const getDataFromPcConnectUrl = async (
   type: ConnectionType
   data: { username: string }
   rtcSessionDescription: RTCSessionDescriptionInit
-}> => {
-  const u = new URL(url)
+} | null> => {
+  let u: URL
+  try { u = new URL(url) } catch { return null }
   const token = u.searchParams.get('token')
   const username = u.searchParams.get('username')
   return {
