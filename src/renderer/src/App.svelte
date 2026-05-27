@@ -26,7 +26,7 @@
   useNavigationEnabled()
   useIsWatching()
   window.PcConnectApi.onConfirmExit(async () => {
-    const r = await Swal.fire({ title: '退出确认', text: '正在共享中，确定要退出吗？观众将断开连接。', icon: 'warning', showCancelButton: true, confirmButtonText: '确定退出', cancelButtonText: '取消' })
+    const r = await Swal.fire({ title: '退出确认', text: '窗口将关闭', icon: 'warning', showCancelButton: true, confirmButtonText: '确定退出', cancelButtonText: '取消' })
     if (r.isConfirmed) window.PcConnectApi.forceClose()
   })
   window.onmessage = async (evt: MessageEvent): Promise<void> => {
