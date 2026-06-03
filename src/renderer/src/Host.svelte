@@ -3,7 +3,7 @@
   import Swal from 'sweetalert2'
   import { L } from './translations'
   import { useNavigationEnabled, useIsHosting, useActiveView } from './stores'
-  import { connectToOBS, startStream, stopStream, disconnectOBS } from './lib/obs-controller'
+  import { connectToOBS, startStream, stopStream, disconnectOBS, getObsFps } from './lib/obs-controller'
 
   const navigationEnabled = useNavigationEnabled()
   const isHosting = useIsHosting()
@@ -23,6 +23,8 @@
   let showLogs = false
   let logs: string[] = []
   let removeLogListener: (() => void) | null = null
+  let currentFps = 0
+  let fpsTimer: ReturnType<typeof setInterval> | null = null
 
   onDestroy(() => { if (removeLogListener) removeLogListener() })
 
@@ -34,7 +36,7 @@
     else { pathFailCount++; if (pathFailCount >= 2) { pathActive = false; pathReason = path.reason } }
   }
 
-  onDestroy(() => { disconnectOBS(); if (statusTimer) clearInterval(statusTimer) })
+  onDestroy(() => { disconnectOBS(); if (statusTimer) clearInterval(statusTimer); if (fpsTimer) clearInterval(fpsTimer) })
 
   async function runDiag(): Promise<void> {
     diagRunning = true
@@ -55,6 +57,8 @@
       removeLogListener = window.PcConnectApi.onLogMessage((msg) => { logs = [...logs.slice(-49), msg] })
       sessionActive = true
       $navigationEnabled = false; $isHosting = true
+      currentFps = 0
+      fpsTimer = setInterval(async () => { currentFps = await getObsFps() }, 1000)
     } catch (e) {
       console.error('Start failed:', e); Swal.close()
       Swal.fire({ position: 'top-end', icon: 'error', title: '启动失败，请重试', showConfirmButton: false, timer: 3000 })
@@ -67,8 +71,9 @@
     try { await stopStream() } catch {}; disconnectOBS()
     try { await window.PcConnectApi.stopStreaming() } catch {}
     if (statusTimer) { clearInterval(statusTimer); statusTimer = null }
+    if (fpsTimer) { clearInterval(fpsTimer); fpsTimer = null }
     pathFailCount = 0; pathActive = false
-    streamKey = ''; hlsUrl = ''
+    streamKey = ''; hlsUrl = ''; currentFps = 0
     sessionActive = false; $navigationEnabled = true; $isHosting = false
     Swal.fire({ position: 'top-end', icon: 'info', title: '推流已结束', showConfirmButton: false, timer: 1500 })
   }
@@ -90,6 +95,7 @@
     <div class="box" style="display:flex;gap:20px;justify-content:center;font-size:13px;">
       <div><span>{obsConnected ? '🟢' : '⚪'}</span> OBS 连接{#if !obsConnected}<br><small>{obsConnReason}</small>{/if}</div>
       <div><span>{pathActive ? '🟢' : '⚪'}</span> 流到达{#if !pathActive}<br><small>{pathReason}</small>{/if}</div>
+      <div><span class="fps-indicator">{currentFps > 0 ? '🟢' : '⚪'}</span> FPS<br><small class="fps-value">{currentFps > 0 ? `${currentFps}` : '—'}</small></div>
     </div>
     <div class="box has-text-centered mb-5">
       <p class="heading">播放链接（发给朋友）</p>

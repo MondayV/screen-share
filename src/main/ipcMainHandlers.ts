@@ -151,7 +151,7 @@ export const ipcMainHandlersInit = (): void => {
         throw new Error(`Cloudflared 组件异常: ${checkErr}`)
       }
       if (cloudflaredProcess) { cloudflaredProcess.kill(); cloudflaredProcess = null }
-      cloudflaredProcess = spawn(cfPath, ['tunnel', '--url', 'http://localhost:8888', '--no-autoupdate'], { env, windowsHide: true })
+      cloudflaredProcess = spawn(cfPath, ['tunnel', '--url', 'http://localhost:8888', '--protocol', 'http2', '--no-autoupdate'], { env, windowsHide: true })
       let buffer = ''
       cloudflaredProcess.stderr?.on('data', (d) => { const m = d.toString(); buffer += m; console.log('[Cloudflared]', m.trim()); sendLog(`[Cloudflared] ${m.trim()}`) })
       cloudflaredProcess.stdout?.on('data', (d) => { const m = d.toString(); buffer += m; console.log('[Cloudflared]', m.trim()); sendLog(`[Cloudflared] ${m.trim()}`) })

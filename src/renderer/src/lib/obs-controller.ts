@@ -38,4 +38,31 @@ export function disconnectOBS(): void {
   if (!obs) return
   try { obs.disconnect() } catch {}
   obs = null
+  fpsPrevFrames = 0
+  fpsPrevTime = 0
+}
+
+let fpsPrevFrames = 0
+let fpsPrevTime = 0
+
+export async function getObsFps(): Promise<number> {
+  if (!obs) return 0
+  try {
+    const stats = await obs.call('GetStats')
+    const totalFrames = (stats as any).outputTotalFrames as number || 0
+    const now = Date.now()
+    if (fpsPrevFrames === 0) {
+      fpsPrevFrames = totalFrames
+      fpsPrevTime = now
+      return 0
+    }
+    const dt = (now - fpsPrevTime) / 1000
+    if (dt < 0.5) return 0
+    const fps = (totalFrames - fpsPrevFrames) / dt
+    fpsPrevFrames = totalFrames
+    fpsPrevTime = now
+    return Math.round(fps * 10) / 10
+  } catch {
+    return 0
+  }
 }
