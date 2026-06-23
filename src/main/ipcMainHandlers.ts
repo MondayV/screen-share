@@ -1,5 +1,5 @@
 import type { SettingsData } from './stateKeeper'
-import { app, BrowserWindow, ipcMain, screen } from 'electron'
+import { app, BrowserWindow, ipcMain, screen, shell } from 'electron'
 import { createCursorsWindow } from './cursors'
 import { settingsKeeper } from './stateKeeper'
 import { spawn, execSync, ChildProcess } from 'child_process'
@@ -10,7 +10,7 @@ function getMediaMTXPath(): string {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, 'tools', 'mediamtx.exe')
   }
-  return 'C:\\mediamtx\\mediamtx.exe'
+  return path.join(__dirname, '..', '..', 'resources', 'tools', 'mediamtx.exe')
 }
 
 function getCloudflaredPath(): string {
@@ -176,6 +176,20 @@ export const ipcMainHandlersInit = (): void => {
   })
   ipcMain.handle('stopStreaming', async (): Promise<void> => {
     stopAllProcesses()
+  })
+  ipcMain.handle('write-push-config', async (_event, data: { server: string; key: string }) => {
+    const obsAppDataDir = path.join(process.env.APPDATA || '', 'obs-studio')
+    if (!fs.existsSync(obsAppDataDir)) fs.mkdirSync(obsAppDataDir, { recursive: true })
+    fs.writeFileSync(path.join(obsAppDataDir, 'pc-connect-push.json'), JSON.stringify(data, null, 2), 'utf-8')
+    return true
+  })
+  ipcMain.handle('open-obs-script-folder', async () => {
+    const scriptDir = app.isPackaged
+      ? path.join(process.resourcesPath, 'obs-script')
+      : path.join(__dirname, '..', '..', 'resources', 'obs-script')
+    if (!fs.existsSync(scriptDir)) fs.mkdirSync(scriptDir, { recursive: true })
+    await shell.openPath(scriptDir)
+    return true
   })
   ipcMain.handle('runDiagnostics', async () => {
     const results: { name: string; status: string; message: string; suggestion: string }[] = []

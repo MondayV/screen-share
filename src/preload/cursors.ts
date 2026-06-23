@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 
 type RemoteCursorData = {
   id: string
@@ -68,7 +68,8 @@ class Cursor {
   }
 }
 
-ipcRenderer.on('updateRemoteCursor', (_, data) => {
+// 通过 contextBridge 将光标相关 IPC 监听器安全暴露
+ipcRenderer.on('updateRemoteCursor', (_event, data) => {
   let cursor: RemoteCursor | undefined = remoteCursors.find((c) => c.getId() === data.id)
   if (cursor) {
     cursor.update(data)
@@ -79,6 +80,15 @@ ipcRenderer.on('updateRemoteCursor', (_, data) => {
   }
 })
 
-ipcRenderer.on('remoteCursorPing', (_, cursorId) => {
+ipcRenderer.on('remoteCursorPing', (_event, cursorId) => {
   remoteCursors.find((c) => c.getId() === cursorId)?.ping()
+})
+
+// 暴露清理 API 供渲染进程必要时使用
+contextBridge.exposeInMainWorld('cursorsApi', {
+  getCursorCount: (): number => remoteCursors.length,
+  clearAll: (): void => {
+    remoteCursors.forEach((c) => c.getRootEl().remove())
+    remoteCursors.length = 0
+  }
 })

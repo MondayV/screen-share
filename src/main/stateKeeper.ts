@@ -50,8 +50,8 @@ export const settingsKeeper = async (): Promise<Settings> => {
     const username = settings.getSync('username') as string || defaultSettings.username
     const color = settings.getSync('color') as string || defaultSettings.color
     const language = settings.getSync('language') as string || defaultSettings.language
-    const isMicrophoneEnabledOnConnect = settings.getSync('isMicrophoneEnabledOnConnect') as boolean ?? defaultSettings.isMicrophoneEnabledOnConnect
-    const iceServers = settings.getSync('iceServers') as IceServer[] || defaultSettings.iceServers
+    const isMicrophoneEnabledOnConnect = settings.getSync('isMicrophoneEnabledOnConnect') as boolean | undefined ?? defaultSettings.isMicrophoneEnabledOnConnect
+    const iceServers = settings.getSync('iceServers') as IceServer[] | undefined ?? defaultSettings.iceServers
 
     return {
       username,

@@ -97,6 +97,12 @@ const PcConnectApi = {
   },
   forceClose: (): void => {
     ipcRenderer.send('force-close')
+  },
+  writePushConfig: (data: { server: string; key: string }): Promise<boolean> => {
+    return ipcRenderer.invoke('write-push-config', data)
+  },
+  openObsScriptFolder: (): Promise<boolean> => {
+    return ipcRenderer.invoke('open-obs-script-folder')
   }
 }
 

@@ -104,6 +104,56 @@
     Swal.close()
   }
 
+  let isPaused = false
+  let volume = 1
+  let currentTime = 0
+  let duration = 0
+  let seekHover = false
+  let seekHoverPos = 0
+  let seekHoverTime = ''
+
+  function onTimeUpdate(): void {
+    currentTime = remoteScreen?.currentTime || 0
+    duration = remoteScreen?.duration || 0
+  }
+
+  function onPauseClick(): void {
+    if (remoteScreen.paused) {
+      remoteScreen.play()
+      isPaused = false
+    } else {
+      remoteScreen.pause()
+      isPaused = true
+    }
+  }
+
+  function onVolumeChange(e: Event): void {
+    const v = parseFloat((e.target as HTMLInputElement).value)
+    volume = v
+    remoteScreen.volume = v
+  }
+
+  function onSeekChange(e: Event): void {
+    const t = parseFloat((e.target as HTMLInputElement).value)
+    remoteScreen.currentTime = t
+  }
+
+  function onSeekHover(e: MouseEvent): void {
+    const rect = (e.target as HTMLElement).getBoundingClientRect()
+    seekHoverPos = ((e.clientX - rect.left) / rect.width) * 100
+    const t = (seekHoverPos / 100) * duration
+    const m = Math.floor(t / 60)
+    const s = Math.floor(t % 60)
+    seekHoverTime = `${m}:${s.toString().padStart(2, '0')}`
+  }
+
+  function formatTime(t: number): string {
+    if (!t || !isFinite(t)) return '0:00'
+    const m = Math.floor(t / 60)
+    const s = Math.floor(t % 60)
+    return `${m}:${s.toString().padStart(2, '0')}`
+  }
+
   const onFullscreenClick = (): void => remoteScreen.requestFullscreen()
   const onZoomInClick = (): void => { zoomFactor += 0.1; remoteScreen.style.scale = zoomFactor.toString() }
   const onZoomOutClick = (): void => {
@@ -166,21 +216,37 @@
 
 <div class={!isStreaming ? 'is-hidden' : ''}>
   <div class="video-overflow">
-    <video bind:this={remoteScreen} class="video" autoplay playsinline muted></video>
+    <video bind:this={remoteScreen} class="video" autoplay playsinline muted on:timeupdate={onTimeUpdate}></video>
   </div>
-  <div class="field mt-3">
-    <div class="control">
-      <button class="button is-info" on:click={onZoomInClick}>
+  <div class="controls-bar mt-3">
+    <!-- 进度条 -->
+    <div class="progress-row">
+      <span class="time-label">{formatTime(currentTime)}</span>
+      <div class="seek-container" role="slider" aria-label="播放进度" aria-valuenow={currentTime} aria-valuemin={0} aria-valuemax={duration || 0} tabindex="-1" on:mousemove={onSeekHover} on:mouseenter={() => seekHover = true} on:mouseleave={() => seekHover = false}>
+        {#if seekHover}
+          <div class="seek-hover" style="left: {seekHoverPos}%;">{seekHoverTime}</div>
+        {/if}
+        <input type="range" min="0" max={duration || 0} value={currentTime} step="0.1"
+          class="seek-bar" on:input={onSeekChange} aria-label="进度" />
+      </div>
+      <span class="time-label">{formatTime(duration)}</span>
+    </div>
+    <div class="control-row">
+      <button class="button is-info is-small" on:click={onPauseClick} title={isPaused ? '播放' : '暂停'}>
+        <span class="icon"><i class="fas fa-{isPaused ? 'play' : 'pause'}"></i></span>
+      </button>
+      <div class="volume-control">
+        <span class="icon is-small"><i class="fas fa-volume-{volume === 0 ? 'mute' : volume < 0.5 ? 'down' : 'up'}"></i></span>
+        <input type="range" min="0" max="1" value={volume} step="0.05" on:input={onVolumeChange} class="volume-bar" aria-label="音量" />
+      </div>
+      <button class="button is-info is-small" on:click={onZoomInClick} title="放大">
         <span class="icon"><i class="fas fa-search-plus"></i></span>
-        <span>{L.zoom_in()}</span>
       </button>
-      <button class="button is-info" on:click={onZoomOutClick}>
+      <button class="button is-info is-small" on:click={onZoomOutClick} title="缩小">
         <span class="icon"><i class="fas fa-search-minus"></i></span>
-        <span>{L.zoom_out()}</span>
       </button>
-      <button class="button is-info" on:click={onFullscreenClick}>
+      <button class="button is-info is-small" on:click={onFullscreenClick} title="全屏">
         <span class="icon"><i class="fas fa-expand"></i></span>
-        <span>{L.fullscreen()}</span>
       </button>
     </div>
   </div>
@@ -189,4 +255,13 @@
 <style>
   .video { width: 100%; height: auto; transition: transform 0.5s linear; }
   .video-overflow { width: 100%; height: auto; overflow: hidden; }
+  .controls-bar { padding: 0 4px; }
+  .progress-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .time-label { font-size: 12px; font-family: monospace; min-width: 36px; color: var(--text-secondary); }
+  .seek-container { flex: 1; position: relative; height: 20px; display: flex; align-items: center; }
+  .seek-bar { width: 100%; height: 4px; cursor: pointer; accent-color: var(--accent-primary); }
+  .seek-hover { position: absolute; bottom: 100%; background: var(--bg-card); color: var(--text-primary); padding: 1px 6px; border-radius: 3px; font-size: 11px; font-family: monospace; white-space: nowrap; pointer-events: none; transform: translateX(-50%); }
+  .control-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .volume-control { display: flex; align-items: center; gap: 4px; }
+  .volume-bar { width: 80px; height: 4px; accent-color: var(--accent-primary); cursor: pointer; }
 </style>

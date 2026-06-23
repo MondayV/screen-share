@@ -17,6 +17,10 @@ extraResources:
     filter:
       - "*.exe"
       - "*.yml"
+  - from: "resources/obs-script"
+    to: "obs-script"
+    filter:
+      - "*.py"
 win:
   executableName: PCConnect
   icon: build/icon.ico

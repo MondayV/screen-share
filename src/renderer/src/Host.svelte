@@ -52,6 +52,8 @@
       streamKey = result.streamKey
       hlsUrl = `${publicUrl}/${streamKey}/index.m3u8`
       try { await connectToOBS(); await startStream(); obsManualMode = false } catch { obsManualMode = true }
+      // 自动写入 OBS 推流配置，供 Lua 脚本一键推流
+      await window.PcConnectApi.writePushConfig({ server: 'rtmp://localhost:1935', key: streamKey })
       Swal.close()
       refreshStatus(); statusTimer = setInterval(refreshStatus, 5000)
       removeLogListener = window.PcConnectApi.onLogMessage((msg) => { logs = [...logs.slice(-49), msg] })
@@ -105,9 +107,13 @@
     <div class="box">
       <p class="heading">OBS 推流信息</p>
       {#if obsManualMode}<p class="mb-2 has-text-warning">⚠️ OBS 未连接，请在 OBS 中手动开始推流</p>{:else}<p class="mb-2 has-text-success">✅ OBS 已连接，正在推流</p>{/if}
-      <div class="field"><label class="label">服务器</label><div class="control"><input class="input is-family-monospace" value="rtmp://localhost:1935" readonly /></div></div>
-      <div class="field"><label class="label">串流密钥</label><div class="control"><input class="input is-family-monospace" value={streamKey} readonly /></div></div>
+      <div class="field"><label class="label" for="server-input">服务器</label><div class="control"><input id="server-input" class="input is-family-monospace" value="rtmp://localhost:1935" readonly /></div></div>
+      <div class="field"><label class="label" for="streamkey-input">串流密钥</label><div class="control"><input id="streamkey-input" class="input is-family-monospace" value={streamKey} readonly /></div></div>
       <button class="button is-info mt-3" on:click={copyObsInfo}><span class="icon"><i class="fas fa-copy"></i></span><span>复制服务器+密钥</span></button>
+      <button class="button is-light mt-3 ml-2" on:click={() => window.PcConnectApi.openObsScriptFolder()}>
+        <span class="icon"><i class="fas fa-folder-open"></i></span><span>📂 打开 OBS 脚本文件夹</span>
+      </button>
+      <p class="help mt-2" style="color:var(--text-secondary);">将脚本文件复制到 OBS 的脚本目录后即可一键推流</p>
     </div>
     <div class="has-text-centered mt-5">
       <button class="button is-danger is-large" on:click={onStopClick}><span class="icon"><i class="fas fa-stop"></i></span><span>结束推流</span></button>

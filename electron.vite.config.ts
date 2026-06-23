@@ -16,7 +16,8 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          index: 'src/preload/index.ts'
+          index: 'src/preload/index.ts',
+          cursors: 'src/preload/cursors.ts'
         }
       }
     },

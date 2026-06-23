@@ -11,6 +11,14 @@ async function getOBSPassword(): Promise<string> {
 }
 
 export async function connectToOBS(): Promise<void> {
+  // 断开已有连接，避免连接泄漏
+  if (obs) {
+    try {
+      const status = await obs.call('GetStats').catch(() => null)
+      if (status) return // 已有活跃连接，复用
+    } catch { /* 连接已失效，重建 */ }
+    disconnectOBS()
+  }
   obs = new OBSWebSocket()
   const password = await getOBSPassword()
   try {

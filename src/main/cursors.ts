@@ -19,8 +19,9 @@ export async function createCursorsWindow(): Promise<BrowserWindow> {
     resizable: false,
     focusable: false,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
+      preload: path.join(__dirname, '../preload/cursors.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
       sandbox: false
     }
   })
