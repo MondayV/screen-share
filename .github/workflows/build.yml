@@ -78,6 +78,3 @@ jobs:
             --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
           gh release upload "$TAG" "$EXE" "$BLOCKMAP" "$LATEST" --clobber \
             --repo "$GITHUB_REPOSITORY"
-
-# 注意：内置的 MediaMTX / cloudflared 为 Windows 二进制，
-# macOS / Linux 目标暂不提供可用的打包产物，仅发布 Windows 安装包。
