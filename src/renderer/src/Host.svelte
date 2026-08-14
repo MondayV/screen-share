@@ -14,6 +14,7 @@
   let streamKey = ''
   let hlsUrl = ''
   let obsManualMode = false
+  let obsAutoError = ''
   let obsConnected = false; let obsConnReason = ''
   let pathActive = false; let pathReason = ''
   let pathFailCount = 0
@@ -29,11 +30,15 @@
   onDestroy(() => { if (removeLogListener) removeLogListener() })
 
   async function refreshStatus(): Promise<void> {
-    const conn = await window.PcConnectApi.checkObsConnection()
-    obsConnected = conn.connected; obsConnReason = conn.reason
-    const path = await window.PcConnectApi.checkPathActive(streamKey)
-    if (path.active) { pathActive = true; pathReason = ''; pathFailCount = 0 }
-    else { pathFailCount++; if (pathFailCount >= 2) { pathActive = false; pathReason = path.reason } }
+    try {
+      const conn = await window.PcConnectApi.checkObsConnection()
+      obsConnected = conn.connected; obsConnReason = conn.reason
+      const path = await window.PcConnectApi.checkPathActive(streamKey)
+      if (path.active) { pathActive = true; pathReason = ''; pathFailCount = 0 }
+      else { pathFailCount++; if (pathFailCount >= 2) { pathActive = false; pathReason = path.reason } }
+    } catch (e) {
+      console.error('refreshStatus failed:', e)
+    }
   }
 
   onDestroy(() => { disconnectOBS(); if (statusTimer) clearInterval(statusTimer); if (fpsTimer) clearInterval(fpsTimer) })
@@ -52,8 +57,9 @@
       streamKey = result.streamKey
       hlsUrl = `${publicUrl}/${streamKey}/index.m3u8`
       // 自动配置 OBS 推流到本会话密钥（P1 修复：避免沿用 OBS 旧密钥导致链接 404）
-      try { await connectToOBS(); await startStreamWithKey(streamKey); obsManualMode = false } catch (e) {
+      try { await connectToOBS(); await startStreamWithKey(streamKey); obsManualMode = false; obsAutoError = '' } catch (e) {
         obsManualMode = true
+        obsAutoError = (e as Error)?.message || '未知错误'
         console.warn('OBS 自动推流失败，切换手动模式:', e)
       }
       // 自动写入 OBS 推流配置，供 Python 脚本一键推流
@@ -99,7 +105,7 @@
 
   {#if sessionActive}
     <div class="box" style="display:flex;gap:20px;justify-content:center;font-size:13px;">
-      <div><span>{obsConnected ? '🟢' : '⚪'}</span> OBS 连接{#if !obsConnected}<br><small>{obsConnReason}</small>{/if}</div>
+      <div><span>{obsConnected ? '🟢' : '⚪'}</span> OBS 连接{#if obsConnReason}<br><small>{obsConnReason}</small>{/if}</div>
       <div><span>{pathActive ? '🟢' : '⚪'}</span> 流到达{#if !pathActive}<br><small>{pathReason}</small>{/if}</div>
       <div><span class="fps-indicator">{currentFps > 0 ? '🟢' : '⚪'}</span> FPS<br><small class="fps-value">{currentFps > 0 ? `${currentFps}` : '—'}</small></div>
     </div>
@@ -110,7 +116,7 @@
     </div>
     <div class="box">
       <p class="heading">OBS 推流信息</p>
-      {#if obsManualMode}<p class="mb-2 has-text-warning">⚠️ OBS 未连接，请在 OBS 中手动开始推流</p>{:else}<p class="mb-2 has-text-success">✅ OBS 已连接，正在推流</p>{/if}
+      {#if obsManualMode}<p class="mb-2 has-text-warning">⚠️ OBS 自动推流失败：{obsAutoError} —— 请在 OBS 中手动填写上方服务器与密钥后开始推流</p>{:else}<p class="mb-2 has-text-success">✅ OBS 已连接，正在推流</p>{/if}
       <div class="field"><label class="label" for="server-input">服务器</label><div class="control"><input id="server-input" class="input is-family-monospace" value="rtmp://localhost:1935" readonly /></div></div>
       <div class="field"><label class="label" for="streamkey-input">串流密钥</label><div class="control"><input id="streamkey-input" class="input is-family-monospace" value={streamKey} readonly /></div></div>
       <button class="button is-info mt-3" on:click={copyObsInfo}><span class="icon"><i class="fas fa-copy"></i></span><span>复制服务器+密钥</span></button>

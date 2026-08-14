@@ -286,31 +286,102 @@ export const ipcMainHandlersInit = (): void => {
 
     return results
   })
+  // OBS WebSocket 握手探测：区分"服务可达"与"需要密码"
+  const probeOBSWebSocketAuth = (): Promise<{ up: boolean; authRequired: boolean | null }> => {
+    return new Promise((resolve) => {
+      let settled = false
+      const finish = (v: { up: boolean; authRequired: boolean | null }): void => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        resolve(v)
+      }
+      let ws: WebSocket
+      try {
+        ws = new WebSocket('ws://127.0.0.1:4455')
+      } catch {
+        finish({ up: false, authRequired: null })
+        return
+      }
+      const timer = setTimeout(() => { try { ws.close() } catch {}; finish({ up: false, authRequired: null }) }, 3000)
+      ws.onmessage = (ev): void => {
+        try {
+          const msg = JSON.parse(String(ev.data))
+          if (msg?.op === 0 && msg?.d) {
+            finish({ up: true, authRequired: !!msg.d.authentication })
+            try { ws.close() } catch {}
+          }
+        } catch { /* 忽略非 JSON 消息 */ }
+      }
+      ws.onerror = (): void => finish({ up: false, authRequired: null })
+      ws.onclose = (): void => finish({ up: false, authRequired: null })
+    })
+  }
+
   ipcMain.handle('checkObsConnection', async () => {
     const net = require('net')
-    return new Promise((resolve) => {
+    const tcpUp = await new Promise<boolean>((resolve) => {
       const s = net.createConnection({ host: '127.0.0.1', port: 4455 })
       s.setTimeout(3000)
-      s.on('connect', () => { s.end(); resolve({ connected: true, reason: '' }) })
-      s.on('timeout', () => { s.destroy(); resolve({ connected: false, reason: 'OBS WebSocket 连接超时' }) })
-      s.on('error', () => { s.destroy(); resolve({ connected: false, reason: '无法连接 OBS，请确认 OBS 已启动并开启 WebSocket 服务' }) })
+      s.on('connect', () => { s.end(); resolve(true) })
+      s.on('timeout', () => { s.destroy(); resolve(false) })
+      s.on('error', () => { s.destroy(); resolve(false) })
     })
+    if (!tcpUp) {
+      return { connected: false, reason: 'OBS 未运行或 WebSocket 未开启（OBS → 工具 → WebSocket 服务器设置）' }
+    }
+    const probe = await probeOBSWebSocketAuth()
+    if (probe.up && probe.authRequired) {
+      return { connected: true, reason: 'OBS 已连接（需 WebSocket 密码，请在设置中填写）' }
+    }
+    if (probe.up) {
+      return { connected: true, reason: '' }
+    }
+    return { connected: false, reason: 'OBS WebSocket 服务异常，请确认已开启' }
   })
   ipcMain.handle('checkPathActive', async (_e, streamKey: string) => {
     const http = require('http')
-    return new Promise((resolve) => {
-      const req = http.request({ hostname: 'localhost', port: 8888, path: `/${streamKey}/index.m3u8`, method: 'GET', timeout: 3000 }, (res: any) => {
-        if (res.statusCode >= 200 && res.statusCode < 400) {
-          resolve({ active: true, reason: '' })
-        } else if (res.statusCode === 404) {
-          resolve({ active: false, reason: '推流未到达，请检查 OBS 推流密钥是否填写正确' })
-        } else {
-          resolve({ active: false, reason: `推流异常 (${res.statusCode})` })
-        }
+    // 跟随 mediamtx 的 cookie 校验重定向（302 + Set-Cookie），最多 3 跳
+    const fetchBody = (path: string, cookie = '', hops = 0): Promise<{ status: number; body: string }> => {
+      return new Promise((resolve) => {
+        const headers: Record<string, string> = {}
+        if (cookie) headers['Cookie'] = cookie
+        const req = http.request({ hostname: '127.0.0.1', port: 8888, path, method: 'GET', timeout: 3000, headers }, (res: any) => {
+          let body = ''
+          res.on('data', (d: Buffer) => { body += d.toString() })
+          res.on('end', () => {
+            if (hops < 3 && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+              const setCookies = res.headers['set-cookie']
+              const nextCookie = Array.isArray(setCookies)
+                ? setCookies.map((c: string) => c.split(';')[0]).join('; ')
+                : ''
+              fetchBody(res.headers.location, nextCookie, hops + 1).then(resolve)
+              return
+            }
+            resolve({ status: res.statusCode, body })
+          })
+        })
+        req.on('timeout', () => { req.destroy(); resolve({ status: 0, body: '' }) })
+        req.on('error', () => resolve({ status: 0, body: '' }))
+        req.end()
       })
-      req.on('timeout', () => { req.destroy(); resolve({ active: false, reason: '查询超时，请确认 MediaMTX 已启动' }) })
-      req.on('error', () => { resolve({ active: false, reason: '无法查询推流状态，请确认 MediaMTX 已启动' }) })
-      req.end()
-    })
+    }
+    // 判断播放列表是否包含媒体引用（master 的 #EXT-X-STREAM-INF 或分片行）
+    const hasMediaRef = (body: string): boolean =>
+      body.includes('#EXT-X-STREAM-INF') || /\.(m4s|ts)(?="|$)/i.test(body) || body.includes('#EXTINF')
+
+    const index = await fetchBody(`/${streamKey}/index.m3u8`)
+    if (index.status === 0) {
+      return { active: false, reason: '查询超时，请确认 MediaMTX 已启动' }
+    }
+    if (index.status >= 400) {
+      return { active: false, reason: '推流未到达，请检查 OBS 推流密钥是否填写正确' }
+    }
+    // mediamtx 仅在推流在线时才返回该路径的播放列表（无推流为 404）；
+    // 再校验内容包含媒体引用，避免重定向残留等空响应误判
+    if (hasMediaRef(index.body)) {
+      return { active: true, reason: '' }
+    }
+    return { active: false, reason: '推流未到达（播放列表为空），请确认 OBS 已开始推流' }
   })
 }
