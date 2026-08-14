@@ -47,21 +47,47 @@
   let volume = 1
   let isPaused = false
   let zoomFactor = 1
+  let shareStartedAt = 0
+  // 播放重试（共享刚注册时 OBS 推流可能尚未就绪，404 先自动重试再提示）
+  let playbackRetries = 0
+  let playbackRetryTimer: ReturnType<typeof setTimeout> | null = null
+  const MAX_PLAYBACK_RETRIES = 6
 
   onMount(async () => {
     try {
       const s = await window.PcConnectApi.getSettings()
       myName = s.username || '我'
     } catch { myName = '我' }
+    // 窗口恢复可见时续播（电量策略可能在后台暂停了视频）
+    document.addEventListener('visibilitychange', onVisibilityChange)
   })
 
   onDestroy(() => {
+    document.removeEventListener('visibilitychange', onVisibilityChange)
     disconnectRoomWs()
     stopPlayback()
     if (statusTimer) { clearInterval(statusTimer); statusTimer = null }
     if (fpsTimer) { clearInterval(fpsTimer); fpsTimer = null }
     disconnectOBS()
   })
+
+  // 播放兜底：处理 Chromium 对 muted 视频的后台电量暂停（AbortError）
+  let playRetryCount = 0
+  const tryPlay = (): void => {
+    if (!remoteScreen) return
+    remoteScreen.play().catch((err: unknown) => {
+      if ((err as { name?: string })?.name === 'AbortError' && playRetryCount < 10) {
+        playRetryCount++
+        setTimeout(tryPlay, 1000)
+      }
+    })
+  }
+  const onVisibilityChange = (): void => {
+    if (document.visibilityState === 'visible' && activeShare && !isPaused) {
+      playRetryCount = 0
+      tryPlay()
+    }
+  }
 
   // ================= 房间连接 =================
   const connectRoomWs = (host: string): void => {
@@ -192,6 +218,7 @@
       if (!res.ok) throw new Error('注册共享失败')
       const { id } = await res.json()
       myShareId = id
+      shareStartedAt = Date.now()
       Swal.close()
       refreshStatus(); statusTimer = setInterval(refreshStatus, 5000)
       currentFps = 0
@@ -237,21 +264,38 @@
     startPlayback(share.streamUrl)
   }
 
-  function startPlayback(url: string): void {
+  const clearPlaybackRetry = (): void => {
+    if (playbackRetryTimer) { clearTimeout(playbackRetryTimer); playbackRetryTimer = null }
+  }
+
+  const schedulePlaybackRetry = (url: string): void => {
+    if (activeShare?.streamUrl !== url) return // 已切换或停止
+    if (playbackRetries >= MAX_PLAYBACK_RETRIES) {
+      Swal.fire({ icon: 'info', title: '该共享暂不可用', text: '共享者可能已结束共享，或网络不可达', confirmButtonText: '知道了' })
+        .then(() => { if (activeShare?.streamUrl === url) activeShare = null })
+      return
+    }
+    playbackRetries++
+    clearPlaybackRetry()
+    playbackRetryTimer = setTimeout(() => startPlayback(url, true), 3000)
+  }
+
+  function startPlayback(url: string, isRetry = false): void {
     if (hls) { hls.destroy(); hls = null }
+    if (!isRetry) { playbackRetries = 0; clearPlaybackRetry(); playRetryCount = 0 }
     if (Hls.isSupported()) {
       hls = new Hls()
       hls.loadSource(url)
       hls.attachMedia(remoteScreen)
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        remoteScreen.play().catch(() => {})
         isPaused = false
+        tryPlay()
       })
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
-          if (data.response?.code === 404) {
-            hls?.destroy(); hls = null
-            Swal.fire({ icon: 'info', title: '该共享已结束', confirmButtonText: '知道了' }).then(() => { if (activeShare?.streamUrl === url) activeShare = null })
+          if (data.response?.code === 404 || data.response?.code === 0) {
+            // 共享刚注册/刚停止的窗口期：先自动重试，不立即报"已结束"
+            schedulePlaybackRetry(url)
             return
           }
           if (data.response?.code === 500) return
@@ -267,11 +311,12 @@
       })
     } else if (remoteScreen.canPlayType('application/vnd.apple.mpegurl')) {
       remoteScreen.src = url
-      remoteScreen.play().catch(() => {})
+      tryPlay()
     }
   }
 
   const stopPlayback = (): void => {
+    clearPlaybackRetry()
     if (hls) { hls.destroy(); hls = null }
     remoteScreen?.pause?.()
     remoteScreen?.removeAttribute?.('src')
@@ -373,8 +418,18 @@
         <div class="box">
           <h2 class="title is-6 mb-2">我的共享</h2>
           {#if myShareId}
-            <p class="mb-2"><span class="tag is-success">正在共享</span> {#if pathActive}<span class="tag">流到达</span>{:else}<span class="tag is-warning" title={pathReason}>流未到达</span>{/if} <span class="tag">{currentFps > 0 ? currentFps + ' FPS' : '—'}</span></p>
-            {#if obsManualMode}<p class="help has-text-warning">OBS 未自动推流：{obsAutoError}</p>{/if}
+            <p class="mb-2">
+              <span class="tag is-success">正在共享</span>
+              {#if pathActive}
+                <span class="tag">流到达</span>
+              {:else if Date.now() - shareStartedAt < 30000}
+                <span class="tag is-info">推流启动中…</span>
+              {:else}
+                <span class="tag is-warning" title={pathReason}>流未到达</span>
+              {/if}
+              <span class="tag">{currentFps > 0 ? currentFps + ' FPS' : '—'}</span>
+            </p>
+            {#if obsManualMode}<p class="help has-text-warning">OBS 未自动推流：{obsAutoError} —— 可在 OBS 中手动填写 rtmp://localhost:1935 与密钥</p>{/if}
             <button class="button is-danger is-fullwidth" on:click={() => stopShare()}>
               <span class="icon is-small"><i class="fas fa-stop"></i></span><span>停止共享</span>
             </button>

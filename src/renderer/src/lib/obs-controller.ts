@@ -22,7 +22,11 @@ export async function connectToOBS(): Promise<void> {
   obs = new OBSWebSocket()
   const password = await getOBSPassword()
   try {
-    await obs.connect('ws://localhost:4455', password)
+    // OBS WebSocket 异常时可能"连上但不应答"，加超时避免共享流程永久卡住
+    await Promise.race([
+      obs.connect('ws://localhost:4455', password),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('连接超时')), 8000))
+    ])
   } catch (err) {
     const msg = (err as Error).message || ''
     if (msg.includes('authentication') || msg.includes('Authentication')) {

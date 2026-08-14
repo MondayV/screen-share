@@ -43,7 +43,9 @@ async function createWindow(): Promise<void> {
       // 安全基线：禁用 Node 集成、开启沙箱（Electron 安全清单要求）
       sandbox: true,
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      // 会议观看场景：切到后台时视频不应被节流/电量策略暂停
+      backgroundThrottling: false
     }
   })
 
