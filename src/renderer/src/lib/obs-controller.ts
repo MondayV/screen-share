@@ -37,6 +37,46 @@ export async function startStream(): Promise<void> {
   await obs.call('StartStream')
 }
 
+/**
+ * 确保 OBS 推流到指定密钥路径（P1 修复）：
+ * 应用生成的公网 URL 指向 /<key>/index.m3u8，因此 OBS 必须推流到该路径。
+ * OBS 不允许在推流中修改推流服务配置，密钥不一致时需要先停流再配置。
+ */
+export async function startStreamWithKey(key: string): Promise<void> {
+  if (!obs) throw new Error('OBS 未连接')
+  if (!key) throw new Error('缺少串流密钥')
+
+  const status = await obs.call('GetStreamStatus')
+  const svc = await obs.call('GetStreamServiceSettings')
+  const currentKey = svc?.streamServiceSettings?.key
+
+  // 已在推目标密钥：直接复用，不打扰用户
+  if (status.outputActive && currentKey === key) return
+
+  // 正在推其他密钥：OBS 不允许流中改配置，先停止
+  if (status.outputActive) {
+    await obs.call('StopStream')
+    // 轮询等待真正停止（最多 6 秒）
+    for (let i = 0; i < 20; i++) {
+      const s = await obs.call('GetStreamStatus')
+      if (!s.outputActive) break
+      await new Promise((r) => setTimeout(r, 300))
+    }
+  }
+
+  // 写入目标推流配置（rtmp_custom + 本机服务器 + 应用生成的密钥）
+  await obs.call('SetStreamServiceSettings', {
+    streamServiceType: 'rtmp_custom',
+    streamServiceSettings: {
+      server: 'rtmp://localhost:1935',
+      key,
+      use_auth: false
+    }
+  })
+
+  await obs.call('StartStream')
+}
+
 export async function stopStream(): Promise<void> {
   if (!obs) return
   try { await obs.call('StopStream') } catch {}

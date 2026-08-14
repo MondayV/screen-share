@@ -3,7 +3,7 @@
   import Swal from 'sweetalert2'
   import { L } from './translations'
   import { useNavigationEnabled, useIsHosting, useActiveView } from './stores'
-  import { connectToOBS, startStream, stopStream, disconnectOBS, getObsFps } from './lib/obs-controller'
+  import { connectToOBS, startStreamWithKey, stopStream, disconnectOBS, getObsFps } from './lib/obs-controller'
 
   const navigationEnabled = useNavigationEnabled()
   const isHosting = useIsHosting()
@@ -51,7 +51,11 @@
       publicUrl = result.publicUrl
       streamKey = result.streamKey
       hlsUrl = `${publicUrl}/${streamKey}/index.m3u8`
-      try { await connectToOBS(); await startStream(); obsManualMode = false } catch { obsManualMode = true }
+      // 自动配置 OBS 推流到本会话密钥（P1 修复：避免沿用 OBS 旧密钥导致链接 404）
+      try { await connectToOBS(); await startStreamWithKey(streamKey); obsManualMode = false } catch (e) {
+        obsManualMode = true
+        console.warn('OBS 自动推流失败，切换手动模式:', e)
+      }
       // 自动写入 OBS 推流配置，供 Python 脚本一键推流
       await window.PcConnectApi.writePushConfig({ server: 'rtmp://localhost:1935', key: streamKey })
       Swal.close()

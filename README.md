@@ -9,7 +9,7 @@
 - 🎨 **多款皮肤**：内置深色和赛博朋克皮肤，一键切换。
 
 ## 📥 安装
-1. 从 [GitHub Releases](https://github.com/MondayV/screen-share/releases) 下载最新安装包（如 `pc-connect-2.4.0-setup.exe`）。
+1. 从 [GitHub Releases](https://github.com/MondayV/screen-share/releases) 下载最新安装包（如 `pc-connect-2.4.1-setup.exe`）。
 2. 双击安装（安装程序会自动创建桌面快捷方式）。
 3. 安装完成后，桌面会出现 `PC Connect` 图标。
 
