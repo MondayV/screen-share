@@ -69,11 +69,7 @@ jobs:
           EXE=$(find release -name '*.exe' | head -n 1)
           BLOCKMAP=$(find release -name '*.blockmap' | head -n 1)
           LATEST=$(find release -name 'latest.yml' | head -n 1)
-          NOTES="## PC Connect $TAG
-自动构建发布。
-
-- 安装包：$(basename "$EXE")
-- 详见 [README](https://github.com/$GITHUB_REPOSITORY/blob/main/README.md)"
+          NOTES=$(printf '## PC Connect %s\n\n自动构建发布。\n\n- 安装包：%s\n- 详见 [README](https://github.com/%s/blob/main/README.md)' "$TAG" "$(basename "$EXE")" "$GITHUB_REPOSITORY")
           gh release create "$TAG" --title "PC Connect $TAG" --notes "$NOTES" \
             --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
           gh release upload "$TAG" "$EXE" "$BLOCKMAP" "$LATEST" --clobber \
