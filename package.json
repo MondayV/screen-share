@@ -1,6 +1,6 @@
 {
   "name": "pc-connect",
-  "version": "2.4.2",
+  "version": "2.5.0",
   "description": "PC Connect - 屏幕共享工具",
   "main": "./out/main/index.js",
   "author": {
@@ -27,7 +27,8 @@
     "hls.js": "^1.7.0",
     "obs-websocket-js": "^5.0.8",
     "sweetalert2": "^11.26.25",
-    "typesafe-i18n": "5.26.2"
+    "typesafe-i18n": "5.26.2",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@fortawesome/fontawesome-free": "6.6.0",

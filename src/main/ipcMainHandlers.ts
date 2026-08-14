@@ -6,6 +6,7 @@ import { spawn, ChildProcess } from 'child_process'
 import { randomBytes } from 'crypto'
 import fs from 'fs'
 import path from 'path'
+import { startRoomServer, getRoomInfo } from './roomServer'
 
 function getMediaMTXPath(): string {
   if (app.isPackaged) {
@@ -38,7 +39,9 @@ function getCloudflaredPath(): string {
 }
 
 let mediamtxProcess: ChildProcess | null = null
-let cloudflaredProcess: ChildProcess | null = null
+// 两个 cloudflared 隧道：媒体(8888→HLS) 与 房间服务(房间端口)
+const mediaTunnel = { proc: null as ChildProcess | null }
+const roomTunnel = { proc: null as ChildProcess | null }
 
 function sendLog(msg: string): void {
   const wins = BrowserWindow.getAllWindows()
@@ -61,13 +64,76 @@ function killProcess(p: ChildProcess | null, name: string): void {
 
 export function stopAllProcesses(): void {
   killProcess(mediamtxProcess, 'MediaMTX'); mediamtxProcess = null
-  killProcess(cloudflaredProcess, 'Cloudflared'); cloudflaredProcess = null
+  killProcess(mediaTunnel.proc, 'Cloudflared(媒体)'); mediaTunnel.proc = null
+  killProcess(roomTunnel.proc, 'Cloudflared(房间)'); roomTunnel.proc = null
+}
+
+const noProxyEnv = (): NodeJS.ProcessEnv => {
+  const env = { ...process.env }
+  delete env.http_proxy; delete env.https_proxy
+  delete env.HTTP_PROXY; delete env.HTTPS_PROXY
+  return env
+}
+
+const checkCloudflared = (p: string): Promise<string | null> => {
+  return new Promise((resolve) => {
+    const proc = spawn(p, ['--version'], { windowsHide: true })
+    let stderr = ''
+    let settled = false
+    const finish = (v: string | null): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve(v)
+    }
+    proc.stderr?.on('data', (d) => { stderr += d.toString() })
+    proc.on('close', (code) => finish(code !== 0 ? (stderr || `exit code ${code}`) : null))
+    proc.on('error', (err) => finish(err.message))
+    const timer = setTimeout(() => { proc.kill(); finish('自检超时') }, 5000)
+  })
+}
+
+/** 启动一个 cloudflared 快速隧道，映射到本地端口，返回公网 https URL */
+const startCloudflaredTunnel = async (localPort: number, holder: { proc: ChildProcess | null }): Promise<string> => {
+  const cfPath = getCloudflaredPath()
+  console.log('[Cloudflared] 使用路径:', cfPath)
+  const checkErr = await checkCloudflared(cfPath)
+  if (checkErr) {
+    if (checkErr.includes('VCRUNTIME') || checkErr.includes('DLL') || checkErr.includes('140')) {
+      throw new Error('缺少 Visual C++ 运行库，请下载安装: https://aka.ms/vs/17/release/vc_redist.x64.exe')
+    }
+    if (checkErr.includes('Permission') || checkErr.includes('denied') || checkErr.includes('EACCES')) {
+      throw new Error('cloudflared 被系统或杀毒软件阻止，请将 PCConnect 添加至信任列表')
+    }
+    throw new Error(`Cloudflared 组件异常: ${checkErr}`)
+  }
+  if (holder.proc) { killProcess(holder.proc, 'Cloudflared(旧隧道)'); holder.proc = null }
+  holder.proc = spawn(cfPath, ['tunnel', '--url', `http://localhost:${localPort}`, '--protocol', 'http2', '--no-autoupdate'], { env: noProxyEnv(), windowsHide: true })
+  let buffer = ''
+  holder.proc.stderr?.on('data', (d) => { const m = d.toString(); buffer += m; console.log('[Cloudflared]', m.trim()); sendLog(`[Cloudflared] ${m.trim()}`) })
+  holder.proc.stdout?.on('data', (d) => { const m = d.toString(); buffer += m; console.log('[Cloudflared]', m.trim()); sendLog(`[Cloudflared] ${m.trim()}`) })
+  return new Promise<string>((resolve, reject) => {
+    const done = (url: string) => { clearTimeout(timer); resolve(url) }
+    const fail = (err: Error) => { clearTimeout(timer); reject(err) }
+    const check = (data: string) => {
+      const m = data.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/)
+      if (m) { sendLog(`[Cloudflared] 隧道已建立: ${m[0]}`); done(m[0]) }
+    }
+    holder.proc!.stderr?.on('data', (d) => check(d.toString()))
+    holder.proc!.stdout?.on('data', (d) => check(d.toString()))
+    holder.proc!.on('error', (e) => fail(e))
+    holder.proc!.on('close', (code) => fail(new Error(`Cloudflared 进程退出(code ${code})`)))
+    const timer = setTimeout(() => { fail(new Error('Cloudflared 隧道启动超时')) }, 90000)
+  })
 }
 
 export const ipcMainHandlersInit = (): void => {
   const availableDimensions = screen.getPrimaryDisplay().workAreaSize
   let remoteCursorsWindow: BrowserWindow | null = null
   let remoteCursorsActive = false
+
+  // 预启动本地房间服务（会议共享列表用），端口自动挑选
+  startRoomServer().catch((e) => console.error('[RoomServer] 启动失败:', e))
 
   ipcMain.handle('toggleRemoteCursors', async (_, state) => {
     remoteCursorsActive = state
@@ -149,69 +215,26 @@ export const ipcMainHandlersInit = (): void => {
         throw err instanceof Error ? err : new Error('MediaMTX 启动失败')
       }
     }
-    const env = { ...process.env }
-    delete env.http_proxy; delete env.https_proxy
-    delete env.HTTP_PROXY; delete env.HTTPS_PROXY
-
-    const checkCloudflared = (p: string): Promise<string | null> => {
-      return new Promise((resolve) => {
-        const proc = spawn(p, ['--version'], { windowsHide: true })
-        let stderr = ''
-        let settled = false
-        const finish = (v: string | null): void => {
-          if (settled) return
-          settled = true
-          clearTimeout(timer)
-          resolve(v)
-        }
-        proc.stderr?.on('data', (d) => { stderr += d.toString() })
-        proc.on('close', (code) => finish(code !== 0 ? (stderr || `exit code ${code}`) : null))
-        proc.on('error', (err) => finish(err.message))
-        const timer = setTimeout(() => { proc.kill(); finish('自检超时') }, 5000)
-      })
-    }
-
-    const startTunnel = async (): Promise<string> => {
-      const cfPath = getCloudflaredPath()
-      console.log('[Cloudflared] 使用路径:', cfPath)
-      const checkErr = await checkCloudflared(cfPath)
-      if (checkErr) {
-        if (checkErr.includes('VCRUNTIME') || checkErr.includes('DLL') || checkErr.includes('140')) {
-          throw new Error('缺少 Visual C++ 运行库，请下载安装: https://aka.ms/vs/17/release/vc_redist.x64.exe')
-        }
-        if (checkErr.includes('Permission') || checkErr.includes('denied') || checkErr.includes('EACCES')) {
-          throw new Error('cloudflared 被系统或杀毒软件阻止，请将 PCConnect 添加至信任列表')
-        }
-        throw new Error(`Cloudflared 组件异常: ${checkErr}`)
-      }
-      if (cloudflaredProcess) { cloudflaredProcess.kill(); cloudflaredProcess = null }
-      cloudflaredProcess = spawn(cfPath, ['tunnel', '--url', 'http://localhost:8888', '--protocol', 'http2', '--no-autoupdate'], { env, windowsHide: true })
-      let buffer = ''
-      cloudflaredProcess.stderr?.on('data', (d) => { const m = d.toString(); buffer += m; console.log('[Cloudflared]', m.trim()); sendLog(`[Cloudflared] ${m.trim()}`) })
-      cloudflaredProcess.stdout?.on('data', (d) => { const m = d.toString(); buffer += m; console.log('[Cloudflared]', m.trim()); sendLog(`[Cloudflared] ${m.trim()}`) })
-      return new Promise<string>((resolve, reject) => {
-        const done = (url: string) => { clearTimeout(timer); resolve(url) }
-        const fail = (err: Error) => { clearTimeout(timer); reject(err) }
-        const check = (data: string) => {
-          const m = data.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/)
-          if (m) { sendLog(`[Cloudflared] 隧道已建立: ${m[0]}`); done(m[0]) }
-        }
-        cloudflaredProcess!.stderr?.on('data', (d) => check(d.toString()))
-        cloudflaredProcess!.stdout?.on('data', (d) => check(d.toString()))
-        cloudflaredProcess!.on('error', (e) => fail(e))
-        cloudflaredProcess!.on('close', (code) => fail(new Error(`Cloudflared 进程退出(code ${code})`)))
-        const timer = setTimeout(() => { fail(new Error('Cloudflared 隧道启动超时')) }, 90000)
-      })
-    }
-
-    const publicUrl = await startTunnel()
+    const publicUrl = await startCloudflaredTunnel(8888, mediaTunnel)
     // 加密级随机密钥（36 进制大写字母数字），避免使用 Math.random
     const STREAM_KEY_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
     const streamKey = Array.from(randomBytes(6), (b) => STREAM_KEY_ALPHABET[b % STREAM_KEY_ALPHABET.length]).join('')
     return { publicUrl, streamKey }
   })
   ipcMain.handle('stopStreaming', async (): Promise<void> => {
-    stopAllProcesses()
+    killProcess(mediamtxProcess, 'MediaMTX'); mediamtxProcess = null
+    killProcess(mediaTunnel.proc, 'Cloudflared(媒体)'); mediaTunnel.proc = null
+  })
+  // 创建会议：确保房间服务运行并为其建立公网隧道，返回会议链接
+  ipcMain.handle('createMeeting', async (): Promise<{ roomUrl: string; roomId: string }> => {
+    const roomPort = await startRoomServer()
+    const roomHost = await startCloudflaredTunnel(roomPort, roomTunnel)
+    const { roomId } = getRoomInfo()
+    return { roomUrl: `${roomHost}/room/${roomId}`, roomId }
+  })
+  // 结束会议（仅房间创建者）：关闭房间隧道（媒体/共享由各自 stopShare 处理）
+  ipcMain.handle('stopMeeting', async (): Promise<void> => {
+    killProcess(roomTunnel.proc, 'Cloudflared(房间)'); roomTunnel.proc = null
   })
   ipcMain.handle('write-push-config', async (_event, data: { server: string; key: string }) => {
     const obsAppDataDir = path.join(process.env.APPDATA || '', 'obs-studio')

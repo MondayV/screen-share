@@ -41,6 +41,12 @@ const PcConnectApi = {
   stopStreaming: async (): Promise<void> => {
     ipcRenderer.invoke('stopStreaming')
   },
+  createMeeting: async (): Promise<{ roomUrl: string; roomId: string }> => {
+    return await ipcRenderer.invoke('createMeeting')
+  },
+  stopMeeting: async (): Promise<void> => {
+    ipcRenderer.invoke('stopMeeting')
+  },
   saveObsPassword: async (pwd: string): Promise<boolean> => {
     return await ipcRenderer.invoke('save-obs-password', pwd)
   },

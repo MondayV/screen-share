@@ -56,6 +56,10 @@ declare global {
       startStreaming: () => Promise<StreamResult>
       stopStreaming: () => Promise<void>
 
+      // ---- 会议 ----
+      createMeeting: () => Promise<{ roomUrl: string; roomId: string }>
+      stopMeeting: () => Promise<void>
+
       // ---- OBS 密码 ----
       saveObsPassword: (pwd: string) => Promise<boolean>
       getObsPassword: () => Promise<string>
