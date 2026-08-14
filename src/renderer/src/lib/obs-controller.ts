@@ -1,6 +1,6 @@
-import OBSWebSocket from 'obs-websocket-js'
+import type OBSWebSocketType from 'obs-websocket-js'
 
-let obs: OBSWebSocket | null = null
+let obs: InstanceType<typeof OBSWebSocketType> | null = null
 
 async function getOBSPassword(): Promise<string> {
   try {
@@ -19,6 +19,8 @@ export async function connectToOBS(): Promise<void> {
     } catch { /* 连接已失效，重建 */ }
     disconnectOBS()
   }
+  // 按需加载（仅共享时需要），减小应用首屏体积
+  const OBSWebSocket = (await import('obs-websocket-js')).default
   obs = new OBSWebSocket()
   const password = await getOBSPassword()
   try {

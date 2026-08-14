@@ -18,7 +18,6 @@ type PathActiveStatus = {
 }
 
 type StreamResult = {
-  publicUrl: string
   streamKey: string
 }
 
@@ -54,6 +53,7 @@ declare global {
 
       // ---- 流媒体 ----
       startStreaming: () => Promise<StreamResult>
+      getStreamUrl: () => Promise<string>
       stopStreaming: () => Promise<void>
 
       // ---- 会议 ----

@@ -20,10 +20,6 @@
 
 <Navigation />
 
-<input type="checkbox" id="panel-toggle" class="sr-only" />
-<div class="rain-container"><label for="panel-toggle" class="panel-switch">◈ DIAG</label></div>
-<div class="rain-layer-2"></div>
-
 {#if $activeView === 'meeting'}
   <Meeting />
 {:else if $activeView === 'settings'}

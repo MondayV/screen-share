@@ -1,4 +1,5 @@
-import '@fortawesome/fontawesome-free/css/all.min.css'
+import '@fortawesome/fontawesome-free/css/fontawesome.min.css'
+import '@fortawesome/fontawesome-free/css/solid.min.css'
 import 'bulma/css/bulma.min.css'
 import '@sweetalert2/theme-bulma/bulma.min.css'
 import { mount } from 'svelte'

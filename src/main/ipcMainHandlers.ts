@@ -107,24 +107,28 @@ const startCloudflaredTunnel = async (localPort: number, holder: { proc: ChildPr
     }
     throw new Error(`Cloudflared 组件异常: ${checkErr}`)
   }
-  if (holder.proc) { killProcess(holder.proc, 'Cloudflared(旧隧道)'); holder.proc = null }
-  holder.proc = spawn(cfPath, ['tunnel', '--url', `http://localhost:${localPort}`, '--protocol', 'http2', '--no-autoupdate'], { env: noProxyEnv(), windowsHide: true })
-  let buffer = ''
-  holder.proc.stderr?.on('data', (d) => { const m = d.toString(); buffer += m; console.log('[Cloudflared]', m.trim()); sendLog(`[Cloudflared] ${m.trim()}`) })
-  holder.proc.stdout?.on('data', (d) => { const m = d.toString(); buffer += m; console.log('[Cloudflared]', m.trim()); sendLog(`[Cloudflared] ${m.trim()}`) })
-  return new Promise<string>((resolve, reject) => {
-    const done = (url: string) => { clearTimeout(timer); resolve(url) }
-    const fail = (err: Error) => { clearTimeout(timer); reject(err) }
-    const check = (data: string) => {
-      const m = data.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/)
-      if (m) { sendLog(`[Cloudflared] 隧道已建立: ${m[0]}`); done(m[0]) }
-    }
-    holder.proc!.stderr?.on('data', (d) => check(d.toString()))
-    holder.proc!.stdout?.on('data', (d) => check(d.toString()))
-    holder.proc!.on('error', (e) => fail(e))
-    holder.proc!.on('close', (code) => fail(new Error(`Cloudflared 进程退出(code ${code})`)))
-    const timer = setTimeout(() => { fail(new Error('Cloudflared 隧道启动超时')) }, 90000)
-  })
+
+  const spawnTunnel = (): Promise<string> => {
+    if (holder.proc) { killProcess(holder.proc, 'Cloudflared(旧隧道)'); holder.proc = null }
+    holder.proc = spawn(cfPath, ['tunnel', '--url', `http://localhost:${localPort}`, '--protocol', 'http2', '--no-autoupdate'], { env: noProxyEnv(), windowsHide: true })
+    holder.proc.stderr?.on('data', (d) => { const m = d.toString().trim(); if (m) { console.log('[Cloudflared]', m); sendLog(`[Cloudflared] ${m}`) } })
+    holder.proc.stdout?.on('data', (d) => { const m = d.toString().trim(); if (m) { console.log('[Cloudflared]', m); sendLog(`[Cloudflared] ${m}`) } })
+    return new Promise<string>((resolve, reject) => {
+      const done = (url: string) => { clearTimeout(timer); resolve(url) }
+      const fail = (err: Error) => { clearTimeout(timer); reject(err) }
+      const check = (data: string) => {
+        const m = data.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/)
+        if (m) { sendLog(`[Cloudflared] 隧道已建立: ${m[0]}`); done(m[0]) }
+      }
+      holder.proc!.stderr?.on('data', (d) => check(d.toString()))
+      holder.proc!.stdout?.on('data', (d) => check(d.toString()))
+      holder.proc!.on('error', (e) => fail(e))
+      holder.proc!.on('close', (code) => fail(new Error(`Cloudflared 进程退出(code ${code})`)))
+      const timer = setTimeout(() => { fail(new Error('Cloudflared 隧道启动超时')) }, 90000)
+    })
+  }
+
+  return await spawnTunnel()
 }
 
 export const ipcMainHandlersInit = (): void => {
@@ -182,48 +186,73 @@ export const ipcMainHandlersInit = (): void => {
   ipcMain.handle('getAppVersion', (): string => {
     return app.getVersion()
   })
-  ipcMain.handle('startStreaming', async (): Promise<{ publicUrl: string; streamKey: string }> => {
-    if (!mediamtxProcess) {
-      mediamtxProcess = spawn(getMediaMTXPath(), [], { cwd: path.dirname(getMediaMTXPath()) })
-      try {
-        await new Promise<void>((resolve, reject) => {
-          let settled = false
-          const settle = (fn: () => void) => (): void => {
-            if (settled) return
-            settled = true
-            clearTimeout(timeout)
-            fn()
-          }
-          const timeout = setTimeout(() => {
-            reject(new Error('MediaMTX 启动超时（30秒），请重试或重启应用'))
-          }, 30000)
-          const onData = (d: { toString(): string }): void => {
-            const m = d.toString()
-            const line = m.trim()
-            if (line) { console.log('[MediaMTX]', line); sendLog(`[MediaMTX] ${line}`) }
-            if (m.includes('HLS') || m.includes('ready')) settle(resolve)()
-          }
-          mediamtxProcess!.stdout?.on('data', onData)
-          mediamtxProcess!.stderr?.on('data', onData)
-          mediamtxProcess!.on('error', (e) => settle(() => reject(e))())
-          mediamtxProcess!.on('close', (code) => settle(() => reject(new Error(`MediaMTX 进程退出(code ${code})`)))())
-        })
-      } catch (err) {
-        // 启动失败：清理子进程并允许重试，绝不向主进程抛出未捕获异常
-        killProcess(mediamtxProcess, 'MediaMTX')
-        mediamtxProcess = null
-        throw err instanceof Error ? err : new Error('MediaMTX 启动失败')
-      }
+  // 确保 MediaMTX 已启动（幂等）
+  const ensureMediamtx = async (): Promise<void> => {
+    if (mediamtxProcess) return
+    mediamtxProcess = spawn(getMediaMTXPath(), [], { cwd: path.dirname(getMediaMTXPath()) })
+    try {
+      await new Promise<void>((resolve, reject) => {
+        let settled = false
+        const settle = (fn: () => void) => (): void => {
+          if (settled) return
+          settled = true
+          clearTimeout(timeout)
+          fn()
+        }
+        const timeout = setTimeout(() => {
+          reject(new Error('MediaMTX 启动超时（30秒），请重试或重启应用'))
+        }, 30000)
+        const onData = (d: { toString(): string }): void => {
+          const m = d.toString()
+          const line = m.trim()
+          if (line) { console.log('[MediaMTX]', line); sendLog(`[MediaMTX] ${line}`) }
+          if (m.includes('HLS') || m.includes('ready')) settle(resolve)()
+        }
+        mediamtxProcess!.stdout?.on('data', onData)
+        mediamtxProcess!.stderr?.on('data', onData)
+        mediamtxProcess!.on('error', (e) => settle(() => reject(e))())
+        mediamtxProcess!.on('close', (code) => settle(() => reject(new Error(`MediaMTX 进程退出(code ${code})`)))())
+      })
+    } catch (err) {
+      // 启动失败：清理子进程并允许重试，绝不向主进程抛出未捕获异常
+      killProcess(mediamtxProcess, 'MediaMTX')
+      mediamtxProcess = null
+      throw err instanceof Error ? err : new Error('MediaMTX 启动失败')
     }
-    const publicUrl = await startCloudflaredTunnel(8888, mediaTunnel)
-    // 加密级随机密钥（36 进制大写字母数字），避免使用 Math.random
-    const STREAM_KEY_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-    const streamKey = Array.from(randomBytes(6), (b) => STREAM_KEY_ALPHABET[b % STREAM_KEY_ALPHABET.length]).join('')
-    return { publicUrl, streamKey }
+  }
+
+  const STREAM_KEY_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  const genStreamKey = (): string =>
+    Array.from(randomBytes(6), (b) => STREAM_KEY_ALPHABET[b % STREAM_KEY_ALPHABET.length]).join('')
+
+  // 媒体隧道（后台进行，供 getStreamUrl 等待）
+  let pendingMediaTunnel: Promise<string> | null = null
+  let mediaTunnelUrl: string | null = null
+
+  // 开始共享：启动 MediaMTX 并立即返回密钥；隧道在后台并行建立，
+  // 渲染进程可同时配置 OBS 推流，待 getStreamUrl 就绪后再注册共享
+  ipcMain.handle('startStreaming', async (): Promise<{ streamKey: string }> => {
+    await ensureMediamtx()
+    const streamKey = genStreamKey()
+    if (!pendingMediaTunnel) {
+      pendingMediaTunnel = startCloudflaredTunnel(8888, mediaTunnel)
+      pendingMediaTunnel
+        .then((url) => { mediaTunnelUrl = url })
+        .catch((e) => console.error('[Cloudflared] 媒体隧道失败:', e))
+    }
+    return { streamKey }
+  })
+  // 获取公网媒体地址（等待后台隧道就绪）
+  ipcMain.handle('getStreamUrl', async (): Promise<string> => {
+    if (mediaTunnelUrl) return mediaTunnelUrl
+    if (!pendingMediaTunnel) throw new Error('尚未开始共享')
+    mediaTunnelUrl = await pendingMediaTunnel
+    return mediaTunnelUrl
   })
   ipcMain.handle('stopStreaming', async (): Promise<void> => {
     killProcess(mediamtxProcess, 'MediaMTX'); mediamtxProcess = null
     killProcess(mediaTunnel.proc, 'Cloudflared(媒体)'); mediaTunnel.proc = null
+    pendingMediaTunnel = null; mediaTunnelUrl = null
   })
   // 创建会议：确保房间服务运行并为其建立公网隧道，返回会议链接
   ipcMain.handle('createMeeting', async (): Promise<{ roomUrl: string; roomId: string }> => {

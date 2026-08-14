@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
   import Swal from 'sweetalert2'
-  import Hls from 'hls.js'
   import { useNavigationEnabled } from './stores'
   import { connectToOBS, startStreamWithKey, stopStream, disconnectOBS, getObsFps } from './lib/obs-controller'
 
@@ -9,18 +8,23 @@
 
   type ShareEntry = { id: string; name: string; streamUrl: string }
 
+  // hls.js 按需加载（仅观看时需要），减小首屏体积
+  let HlsClass: typeof import('hls.js').default | null = null
+  const getHls = async (): Promise<typeof import('hls.js').default> => {
+    if (!HlsClass) HlsClass = (await import('hls.js')).default
+    return HlsClass
+  }
+
   // ---------- 视图与房间状态 ----------
   let mode: 'home' | 'meeting' = 'home'
   let myName = ''
   let meetingLinkInput = ''
   let meetingLink = ''                    // 当前会议链接（创建/加入后保存，用于展示与复制）
   let roomHost = ''                       // https://xxx.trycloudflare.com（房间服务）
-  let ws: WebSocket | null = null
   let roomConnected = false
   let roomClosed = false
   let leavingRoom = false
-  let wsRetryTimer: ReturnType<typeof setTimeout> | null = null
-  let wsRetries = 0
+  let pollTimer: ReturnType<typeof setInterval> | null = null
   let shares: ShareEntry[] = []
   let activeShare: ShareEntry | null = null
   let myShareId: string | null = null
@@ -64,21 +68,21 @@
 
   onDestroy(() => {
     document.removeEventListener('visibilitychange', onVisibilityChange)
-    disconnectRoomWs()
+    stopRoomSync()
     stopPlayback()
     if (statusTimer) { clearInterval(statusTimer); statusTimer = null }
     if (fpsTimer) { clearInterval(fpsTimer); fpsTimer = null }
     disconnectOBS()
   })
 
-  // 播放兜底：处理 Chromium 对 muted 视频的后台电量暂停（AbortError）
+  // 播放兜底：处理 Chromium 自动播放拦截/电量暂停（任何 play() 拒绝都重试）
   let playRetryCount = 0
   const tryPlay = (): void => {
     if (!remoteScreen) return
-    remoteScreen.play().catch((err: unknown) => {
-      if ((err as { name?: string })?.name === 'AbortError' && playRetryCount < 10) {
+    remoteScreen.play().catch(() => {
+      if (playRetryCount < 20) {
         playRetryCount++
-        setTimeout(tryPlay, 1000)
+        setTimeout(tryPlay, 500)
       }
     })
   }
@@ -89,51 +93,54 @@
     }
   }
 
-  // ================= 房间连接 =================
-  const connectRoomWs = (host: string): void => {
-    roomHost = host
-    const connect = (): void => {
-      if (leavingRoom) return
-      ws = new WebSocket(host.replace(/^http/, 'ws') + '/ws')
-      ws.onopen = () => { roomConnected = true; roomClosed = false; wsRetries = 0 }
-      ws.onclose = () => { roomConnected = false; roomClosed = true; scheduleReconnect() }
-      ws.onerror = () => { /* onclose 随后触发 */ }
-      ws.onmessage = (ev) => {
-        try {
-          const data = JSON.parse(ev.data as string)
-          if (data.type === 'room' && Array.isArray(data.shares)) {
-            shares = data.shares
-            // 我的共享被移除时同步状态
-            if (myShareId && !shares.some((s) => s.id === myShareId)) {
-              myShareId = null
-              if (activeShare?.streamUrl === hlsUrl) stopPlayback()
-            }
-            // 无观看对象时自动播放第一路共享
-            if (!activeShare && shares.length > 0) setActiveShare(shares[0])
-          }
-        } catch { /* 忽略非 JSON 消息 */ }
+  // ================= 房间同步（HTTP 轮询，2.5s）=================
+  // 说明：WS 在 cloudflared http2 隧道上偶发挂起（浏览器兼容问题），
+  // 内部会议规模小，改用稳定的 HTTPS 轮询，简单可靠。
+  const syncRoom = async (): Promise<void> => {
+    if (!roomHost || leavingRoom) return
+    try {
+      const res = await fetch(roomHost + '/api/room', { signal: AbortSignal.timeout(8000) })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      if (data.type === 'room' && Array.isArray(data.shares)) {
+        roomConnected = true; roomClosed = false
+        shares = data.shares
+        // 我的共享被移除时同步状态
+        if (myShareId && !shares.some((s) => s.id === myShareId)) {
+          myShareId = null
+          if (activeShare?.streamUrl === hlsUrl) stopPlayback()
+        }
+        // 无观看对象时自动播放第一路共享
+        if (!activeShare && shares.length > 0) setActiveShare(shares[0])
       }
+    } catch {
+      roomConnected = false
+      roomClosed = true
     }
-    // 隧道就绪前连接会失败，退避重连直至成功
-    const scheduleReconnect = (): void => {
-      if (leavingRoom) return
-      const delay = Math.min(1000 * Math.pow(2, wsRetries), 15000)
-      wsRetries++
-      if (wsRetryTimer) clearTimeout(wsRetryTimer)
-      wsRetryTimer = setTimeout(() => connect(), delay)
-    }
-    connect()
   }
 
-  const disconnectRoomWs = (): void => {
+  const startRoomSync = (): void => {
+    void syncRoom()
+    pollTimer = setInterval(() => { void syncRoom() }, 2500)
+  }
+
+  const stopRoomSync = (): void => {
     leavingRoom = true
-    if (wsRetryTimer) { clearTimeout(wsRetryTimer); wsRetryTimer = null }
-    if (ws) { try { ws.close() } catch {}; ws = null }
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
     roomConnected = false
   }
 
-  const roomApi = async (path: string, init?: RequestInit): Promise<Response> => {
-    return await fetch(roomHost + path, init)
+  const roomApi = async (path: string, init?: RequestInit, retries = 3): Promise<Response> => {
+    let lastErr: unknown = null
+    for (let i = 0; i <= retries; i++) {
+      try {
+        return await fetch(roomHost + path, init)
+      } catch (e) {
+        lastErr = e
+        if (i < retries) await new Promise((r) => setTimeout(r, 1000))
+      }
+    }
+    throw lastErr instanceof Error ? lastErr : new Error('请求失败')
   }
 
   // ================= 创建 / 加入会议 =================
@@ -172,7 +179,7 @@
     const u = new URL(link)
     roomHost = u.origin
     leavingRoom = false
-    connectRoomWs(u.origin)
+    startRoomSync()
     mode = 'meeting'
     $navigationEnabled = false
   }
@@ -187,7 +194,7 @@
     if (!r.isConfirmed) return
     await stopShare(true)
     if (amCreator) { try { await window.PcConnectApi.stopMeeting() } catch {} }
-    disconnectRoomWs()
+    stopRoomSync()
     stopPlayback()
     mode = 'home'
     $navigationEnabled = true
@@ -195,21 +202,34 @@
   }
 
   // ================= 我的共享 =================
+  let shareStarting = false
+
   const startShare = async (): Promise<void> => {
+    if (shareStarting) return
+    shareStarting = true
     try {
       Swal.fire({ title: '正在启动共享...', allowOutsideClick: false, didOpen: () => Swal.showLoading() })
-      const result = await window.PcConnectApi.startStreaming()
-      publicUrl = result.publicUrl
-      streamKey = result.streamKey
-      hlsUrl = `${publicUrl}/${streamKey}/index.m3u8`
-      // 自动配置 OBS 推流到本会话密钥（若 OBS 可用）
-      try { await connectToOBS(); await startStreamWithKey(streamKey); obsManualMode = false; obsAutoError = '' } catch (e) {
-        obsManualMode = true
-        obsAutoError = (e as Error)?.message || '未知错误'
-        console.warn('OBS 自动推流失败，切换手动模式:', e)
+      // 1. 启动 MediaMTX 并立即拿到会话密钥（不等待公网隧道）
+      const { streamKey: key } = await window.PcConnectApi.startStreaming()
+      streamKey = key
+      // 2. 并行：配置 OBS 推流 + 等待公网隧道就绪
+      const [publicUrlResult] = await Promise.allSettled([
+        window.PcConnectApi.getStreamUrl(),
+        (async () => {
+          try { await connectToOBS(); await startStreamWithKey(key); obsManualMode = false; obsAutoError = '' } catch (e) {
+            obsManualMode = true
+            obsAutoError = (e as Error)?.message || '未知错误'
+            console.warn('OBS 自动推流失败，切换手动模式:', e)
+          }
+          await window.PcConnectApi.writePushConfig({ server: 'rtmp://localhost:1935', key })
+        })()
+      ])
+      if (publicUrlResult.status !== 'fulfilled') {
+        throw publicUrlResult.reason instanceof Error ? publicUrlResult.reason : new Error('公网隧道建立失败')
       }
-      await window.PcConnectApi.writePushConfig({ server: 'rtmp://localhost:1935', key: streamKey })
-      // 注册到房间共享列表
+      publicUrl = publicUrlResult.value
+      hlsUrl = `${publicUrl}/${key}/index.m3u8`
+      // 3. 注册到房间共享列表
       const res = await roomApi('/api/share', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -220,7 +240,7 @@
       myShareId = id
       shareStartedAt = Date.now()
       Swal.close()
-      refreshStatus(); statusTimer = setInterval(refreshStatus, 5000)
+      refreshStatus(); statusTimer = setInterval(refreshStatus, 2000)
       currentFps = 0
       fpsTimer = setInterval(async () => { currentFps = await getObsFps() }, 1000)
       // 共享自己的画面
@@ -228,7 +248,13 @@
       setActiveShare(mine)
     } catch (e) {
       console.error('启动共享失败:', e); Swal.close()
+      // 失败回滚：停止 OBS 推流与媒体服务，避免残留
+      try { await stopStream() } catch {}; disconnectOBS()
+      try { await window.PcConnectApi.stopStreaming() } catch {}
+      streamKey = ''; hlsUrl = ''
       Swal.fire({ position: 'top-end', icon: 'error', title: '启动共享失败，请重试', showConfirmButton: false, timer: 3000 })
+    } finally {
+      shareStarting = false
     }
   }
 
@@ -261,7 +287,7 @@
   const setActiveShare = (share: ShareEntry): void => {
     if (activeShare?.streamUrl === share.streamUrl && hls) return
     activeShare = share
-    startPlayback(share.streamUrl)
+    startPlayback(share.streamUrl).catch(() => {})
   }
 
   const clearPlaybackRetry = (): void => {
@@ -277,14 +303,19 @@
     }
     playbackRetries++
     clearPlaybackRetry()
-    playbackRetryTimer = setTimeout(() => startPlayback(url, true), 3000)
+    playbackRetryTimer = setTimeout(() => { void startPlayback(url, true) }, 3000)
   }
 
-  function startPlayback(url: string, isRetry = false): void {
+  async function startPlayback(url: string, isRetry = false): Promise<void> {
     if (hls) { hls.destroy(); hls = null }
     if (!isRetry) { playbackRetries = 0; clearPlaybackRetry(); playRetryCount = 0 }
+    const Hls = await getHls()
     if (Hls.isSupported()) {
-      hls = new Hls()
+      // 低延迟：LL-HLS 下贴近直播边缘（目标 behind ~2-3s）
+      hls = new Hls({
+        lowLatencyMode: true,
+        liveSyncDurationCount: 2
+      })
       hls.loadSource(url)
       hls.attachMedia(remoteScreen)
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -303,7 +334,7 @@
             errorShown = true
             Swal.fire({ icon: 'warning', title: '无法加载画面', text: '共享者可能尚未开始推流', showConfirmButton: true, confirmButtonText: '重试', showCancelButton: true, cancelButtonText: '关闭' }).then((r) => {
               errorShown = false
-              if (r.isConfirmed) { hls?.destroy(); hls = null; startPlayback(url) }
+              if (r.isConfirmed) { hls?.destroy(); hls = null; void startPlayback(url) }
               else { if (activeShare?.streamUrl === url) activeShare = null }
             })
           }
