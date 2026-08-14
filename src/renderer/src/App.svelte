@@ -6,22 +6,12 @@
   import Host from './Host.svelte'
   import Settings from './Settings.svelte'
   import About from './About.svelte'
-  import {
-    useActiveView,
-    useNavigationEnabled,
-    useIsHosting,
-    useIsWatching,
-    useParticipantUrl,
-    useHostUrl
-  } from './stores'
+  import { useActiveView, useNavigationEnabled, useIsHosting, useIsWatching } from './stores'
   import { theme } from './theme'
-  import { getDataFromPcConnectUrl } from './Utils'
   import Swal from 'sweetalert2'
   const activeView = useActiveView()
   theme // keep reference so subscription runs
 
-  const participantUrl = useParticipantUrl()
-  const hostUrl = useHostUrl()
   const isHosting = useIsHosting()
   useNavigationEnabled()
   useIsWatching()
@@ -29,21 +19,6 @@
     const r = await Swal.fire({ title: '退出确认', text: '窗口将关闭', icon: 'warning', showCancelButton: true, confirmButtonText: '确定退出', cancelButtonText: '取消' })
     if (r.isConfirmed) window.PcConnectApi.forceClose()
   })
-  window.onmessage = async (evt: MessageEvent): Promise<void> => {
-    const { data } = evt
-    if (data.type !== 'openPcConnectURL') return
-    const urlData = await getDataFromPcConnectUrl(data.url)
-    switch (urlData.type) {
-      case 'host':
-        $activeView = 'join'
-        $participantUrl = data.url
-        break
-      case 'participant':
-        if ($activeView !== 'host' || !$isHosting) return
-        $hostUrl = data.url
-        break
-    }
-  }
 </script>
 
 <Navigation />

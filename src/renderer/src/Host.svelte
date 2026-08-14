@@ -52,7 +52,7 @@
       streamKey = result.streamKey
       hlsUrl = `${publicUrl}/${streamKey}/index.m3u8`
       try { await connectToOBS(); await startStream(); obsManualMode = false } catch { obsManualMode = true }
-      // 自动写入 OBS 推流配置，供 Lua 脚本一键推流
+      // 自动写入 OBS 推流配置，供 Python 脚本一键推流
       await window.PcConnectApi.writePushConfig({ server: 'rtmp://localhost:1935', key: streamKey })
       Swal.close()
       refreshStatus(); statusTimer = setInterval(refreshStatus, 5000)

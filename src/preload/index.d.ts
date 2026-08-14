@@ -1,11 +1,5 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 
-type IceServer = {
-  urls: string
-  username?: string
-  credential?: string
-}
-
 type DiagResult = {
   name: string
   status: string
@@ -32,8 +26,6 @@ type SettingsData = {
   username: string
   color: string
   language: string
-  isMicrophoneEnabledOnConnect: boolean
-  iceServers: IceServer[]
 }
 
 type RemoteCursorState = {
@@ -86,9 +78,6 @@ declare global {
       // ---- 退出 ----
       onConfirmExit: (cb: () => void) => void
       forceClose: () => void
-
-      // ---- URL 处理 ----
-      handleUrlClicks: (state?: boolean) => boolean
 
       // ---- OBS 一键推流 (Python) ----
       writePushConfig: (data: PushConfig) => Promise<boolean>

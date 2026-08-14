@@ -10,7 +10,7 @@
     version = await window.PcConnectApi.getAppVersion()
   })()
 
-  const GITHUB_REPO_URL = 'https://github.com/pc-connect/pc-connect'
+  const GITHUB_REPO_URL = 'https://github.com/MondayV/screen-share'
 
   function openExternalURL(e: MouseEvent & { currentTarget: HTMLButtonElement }): void {
     const url = e.currentTarget.dataset.url

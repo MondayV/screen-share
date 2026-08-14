@@ -1,5 +1,5 @@
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
-import { svelte } from '@sveltejs/vite-plugin-svelte'
+import { svelte, vitePreprocess } from '@sveltejs/vite-plugin-svelte'
 
 export default defineConfig({
   main: {
@@ -14,14 +14,19 @@ export default defineConfig({
   },
   preload: {
     build: {
+      // sandbox 下只能 require('electron')，其余依赖必须内联打包，
+      // 因此禁用 electron-vite 5 默认注入的 externalizeDeps
+      externalizeDeps: false,
       rollupOptions: {
         input: {
           index: 'src/preload/index.ts',
           cursors: 'src/preload/cursors.ts'
-        }
+        },
+        // 仅外部化 electron 与 Node 内建模块
+        external: ['electron', /^electron\/.+/, 'node:electron']
       }
     },
-    plugins: [externalizeDepsPlugin()]
+    plugins: []
   },
   renderer: {
     build: {
@@ -32,6 +37,11 @@ export default defineConfig({
         }
       }
     },
-    plugins: [svelte()]
+    plugins: [
+      svelte({
+        // 显式声明 preprocess，避免依赖 svelte.config.mjs 的隐式加载
+        preprocess: vitePreprocess()
+      })
+    ]
   }
 })

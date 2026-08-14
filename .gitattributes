@@ -1,0 +1,10 @@
+# 强制二进制文件按二进制处理
+*.exe binary
+*.dll binary
+*.ico binary
+*.icns binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary

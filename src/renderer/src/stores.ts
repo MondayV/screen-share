@@ -8,7 +8,3 @@ export const useNavigationEnabled = (): Writable<boolean> => useWritable('naviga
 export const useIsHosting = (): Writable<boolean> => useWritable('isHosting', false)
 
 export const useIsWatching = (): Writable<boolean> => useWritable('useIsWatching', false)
-
-export const useHostUrl = (): Writable<string> => useWritable('useHostUrl', '')
-
-export const useParticipantUrl = (): Writable<string> => useWritable('useParticipantUrl', '')

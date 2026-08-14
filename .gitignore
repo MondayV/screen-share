@@ -9,3 +9,8 @@ release/
 *.zip
 .env
 .claude/
+
+# 内置工具二进制按需下载（见 scripts/fetch-tools.mjs），不入库
+resources/tools/*.exe
+resources/tools/*.tmp
+resources/tools/*.d/

@@ -15,6 +15,7 @@
   let hls: Hls | null = null
   let zoomFactor = 1
   let errorShown = false
+  let isMuted = true
 
   onDestroy(() => {
     if (hls) { hls.destroy(); hls = null }
@@ -99,6 +100,7 @@
     isStreaming = false
     joinAttempting = false
     errorShown = false
+    isMuted = true
     $navigationEnabled = true
     $isWatching = false
     Swal.close()
@@ -131,6 +133,15 @@
     const v = parseFloat((e.target as HTMLInputElement).value)
     volume = v
     remoteScreen.volume = v
+  }
+
+  // 静音/取消静音：autoplay 要求初始静音，用户手势后可解除
+  function onToggleMute(): void {
+    isMuted = !isMuted
+    remoteScreen.muted = isMuted
+    if (!isMuted) {
+      remoteScreen.play().catch(() => {})
+    }
   }
 
   function onSeekChange(e: Event): void {
@@ -216,7 +227,7 @@
 
 <div class={!isStreaming ? 'is-hidden' : ''}>
   <div class="video-overflow">
-    <video bind:this={remoteScreen} class="video" autoplay playsinline muted on:timeupdate={onTimeUpdate}></video>
+    <video bind:this={remoteScreen} class="video" autoplay playsinline muted={isMuted} on:timeupdate={onTimeUpdate}></video>
   </div>
   <div class="controls-bar mt-3">
     <!-- 进度条 -->
@@ -234,6 +245,9 @@
     <div class="control-row">
       <button class="button is-info is-small" on:click={onPauseClick} title={isPaused ? '播放' : '暂停'}>
         <span class="icon"><i class="fas fa-{isPaused ? 'play' : 'pause'}"></i></span>
+      </button>
+      <button class="button is-info is-small" on:click={onToggleMute} title={isMuted ? '取消静音' : '静音'}>
+        <span class="icon"><i class="fas fa-volume-{isMuted ? 'xmark' : 'up'}"></i></span>
       </button>
       <div class="volume-control">
         <span class="icon is-small"><i class="fas fa-volume-{volume === 0 ? 'mute' : volume < 0.5 ? 'down' : 'up'}"></i></span>

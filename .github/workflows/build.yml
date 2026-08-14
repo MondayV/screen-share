@@ -1,0 +1,83 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-win:
+    name: Build & package Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies (downloads bundled tools)
+        run: npm ci --no-audit --no-fund
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build (electron-vite)
+        run: npm run build
+
+      - name: Package NSIS installer
+        run: npx electron-builder --win --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pc-connect-win
+          path: |
+            release/*.exe
+            release/*.blockmap
+            release/latest.yml
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-win
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download built installer
+        uses: actions/download-artifact@v4
+        with:
+          name: pc-connect-win
+          path: release
+
+      - name: Create / update Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          EXE=$(find release -name '*.exe' | head -n 1)
+          BLOCKMAP=$(find release -name '*.blockmap' | head -n 1)
+          LATEST=$(find release -name 'latest.yml' | head -n 1)
+          NOTES="## PC Connect $TAG
+自动构建发布。
+
+- 安装包：$(basename "$EXE")
+- 详见 [README](https://github.com/$GITHUB_REPOSITORY/blob/main/README.md)"
+          gh release create "$TAG" --title "PC Connect $TAG" --notes "$NOTES" \
+            --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+          gh release upload "$TAG" "$EXE" "$BLOCKMAP" "$LATEST" --clobber \
+            --repo "$GITHUB_REPOSITORY"
+
+# 注意：内置的 MediaMTX / cloudflared 为 Windows 二进制，
+# macOS / Linux 目标暂不提供可用的打包产物，仅发布 Windows 安装包。

@@ -2,18 +2,10 @@ import { screen } from 'electron'
 import settings from 'electron-settings'
 import { debounce } from './utils'
 
-type IceServer = {
-  urls: string
-  username?: string
-  credential?: string
-}
-
 export type SettingsData = {
   username: string
   color: string
   language: string
-  isMicrophoneEnabledOnConnect: boolean
-  iceServers: IceServer[]
 }
 
 type Settings = {
@@ -37,28 +29,18 @@ export const settingsKeeper = async (): Promise<Settings> => {
   const defaultSettings: SettingsData = {
     username: 'PC用户',
     color: '#ffffff',
-    language: 'zh',
-    isMicrophoneEnabledOnConnect: true,
-    iceServers: [
-      {
-        urls: 'stun:stun.l.google.com:19302'
-      }
-    ]
+    language: 'zh'
   }
 
   const get = (): SettingsData => {
     const username = settings.getSync('username') as string || defaultSettings.username
     const color = settings.getSync('color') as string || defaultSettings.color
     const language = settings.getSync('language') as string || defaultSettings.language
-    const isMicrophoneEnabledOnConnect = settings.getSync('isMicrophoneEnabledOnConnect') as boolean | undefined ?? defaultSettings.isMicrophoneEnabledOnConnect
-    const iceServers = settings.getSync('iceServers') as IceServer[] | undefined ?? defaultSettings.iceServers
 
     return {
       username,
       color,
-      language,
-      isMicrophoneEnabledOnConnect,
-      iceServers
+      language
     }
   }
 
@@ -66,8 +48,6 @@ export const settingsKeeper = async (): Promise<Settings> => {
     settings.setSync('username', data.username)
     settings.setSync('color', data.color)
     settings.setSync('language', data.language)
-    settings.setSync('isMicrophoneEnabledOnConnect', data.isMicrophoneEnabledOnConnect)
-    settings.setSync('iceServers', data.iceServers)
   }
 
   return {
@@ -104,6 +84,23 @@ export const windowStateKeeper = async (windowName: string): Promise<WindowState
 
   const currentState = settings.getSync(`windowState.${windowName}`) as WindowState | undefined
   windowState = { ...defaultState, ...currentState }
+
+  // 校验保存的位置是否仍在某个显示器内，避免显示器变更后窗口跑到屏幕外
+  if (windowState.x !== undefined && windowState.y !== undefined) {
+    const isVisible = screen.getAllDisplays().some((display) => {
+      const wa = display.workArea
+      return (
+        windowState.x! < wa.x + wa.width &&
+        windowState.x! + windowState.width > wa.x &&
+        windowState.y! < wa.y + wa.height &&
+        windowState.y! + windowState.height > wa.y
+      )
+    })
+    if (!isVisible) {
+      windowState.x = undefined
+      windowState.y = undefined
+    }
+  }
 
   const track = (win: Electron.BrowserWindow): void => {
     window = win

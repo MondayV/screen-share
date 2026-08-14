@@ -2,7 +2,8 @@ import type { SettingsData } from './stateKeeper'
 import { app, BrowserWindow, ipcMain, screen, shell } from 'electron'
 import { createCursorsWindow } from './cursors'
 import { settingsKeeper } from './stateKeeper'
-import { spawn, execSync, ChildProcess } from 'child_process'
+import { spawn, ChildProcess } from 'child_process'
+import { randomBytes } from 'crypto'
 import fs from 'fs'
 import path from 'path'
 
@@ -17,16 +18,23 @@ function getCloudflaredPath(): string {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, 'tools', 'cloudflared.exe')
   }
-  const userProfile = process.env.USERPROFILE || 'C:\\Users\\MONv'
-  const candidates = [
-    path.join(userProfile, 'scoop', 'apps', 'cloudflared', 'current', 'cloudflared.exe'),
-    path.join(userProfile, 'scoop', 'shims', 'cloudflared.exe'),
-    'C:\\Windows\\System32\\cloudflared.exe'
-  ]
+  const candidates: string[] = []
+  if (process.platform === 'win32') {
+    const userProfile = process.env.USERPROFILE || process.env.HOME || ''
+    if (userProfile) {
+      candidates.push(
+        path.join(userProfile, 'scoop', 'apps', 'cloudflared', 'current', 'cloudflared.exe'),
+        path.join(userProfile, 'scoop', 'shims', 'cloudflared.exe')
+      )
+    }
+    candidates.push('C:\\Windows\\System32\\cloudflared.exe')
+  } else {
+    candidates.push('/usr/local/bin/cloudflared', '/usr/bin/cloudflared')
+  }
   for (const p of candidates) {
     if (fs.existsSync(p)) return p
   }
-  return 'cloudflared.exe'
+  return process.platform === 'win32' ? 'cloudflared.exe' : 'cloudflared'
 }
 
 let mediamtxProcess: ChildProcess | null = null
@@ -39,7 +47,14 @@ function sendLog(msg: string): void {
 
 function killProcess(p: ChildProcess | null, name: string): void {
   if (!p) return
-  try { execSync(`taskkill /PID ${p.pid} /F /T`, { stdio: 'ignore' }) } catch {}
+  try {
+    if (process.platform === 'win32') {
+      // 异步终止整个进程树，避免阻塞退出流程
+      spawn('taskkill', ['/PID', String(p.pid), '/F', '/T'], { stdio: 'ignore' })
+    } else {
+      p.kill('SIGTERM')
+    }
+  } catch {}
   try { p.kill() } catch {}
   console.log(`[Cleanup] ${name} 已终止`)
 }
@@ -104,23 +119,35 @@ export const ipcMainHandlersInit = (): void => {
   ipcMain.handle('startStreaming', async (): Promise<{ publicUrl: string; streamKey: string }> => {
     if (!mediamtxProcess) {
       mediamtxProcess = spawn(getMediaMTXPath(), [], { cwd: path.dirname(getMediaMTXPath()) })
-      mediamtxProcess.stderr?.on('data', (d) => { const m = d.toString().trim(); console.log('[MediaMTX]', m); sendLog(`[MediaMTX] ${m}`) })
-      mediamtxProcess.stdout?.on('data', (d) => { const m = d.toString().trim(); console.log('[MediaMTX]', m); sendLog(`[MediaMTX] ${m}`) })
-      const timeout = setTimeout(() => {
-        mediamtxProcess?.kill()
-        throw new Error('MediaMTX 启动超时（30秒），请重试或重启应用')
-      }, 30000)
       try {
         await new Promise<void>((resolve, reject) => {
-          mediamtxProcess!.stdout?.on('data', (d) => {
-            if (d.toString().includes('HLS') || d.toString().includes('ready')) { clearTimeout(timeout); resolve() }
-          })
-          mediamtxProcess!.stderr?.on('data', (d) => {
-            if (d.toString().includes('HLS') || d.toString().includes('ready')) { clearTimeout(timeout); resolve() }
-          })
-          mediamtxProcess!.on('error', (e) => { clearTimeout(timeout); reject(e) })
+          let settled = false
+          const settle = (fn: () => void) => (): void => {
+            if (settled) return
+            settled = true
+            clearTimeout(timeout)
+            fn()
+          }
+          const timeout = setTimeout(() => {
+            reject(new Error('MediaMTX 启动超时（30秒），请重试或重启应用'))
+          }, 30000)
+          const onData = (d: { toString(): string }): void => {
+            const m = d.toString()
+            const line = m.trim()
+            if (line) { console.log('[MediaMTX]', line); sendLog(`[MediaMTX] ${line}`) }
+            if (m.includes('HLS') || m.includes('ready')) settle(resolve)()
+          }
+          mediamtxProcess!.stdout?.on('data', onData)
+          mediamtxProcess!.stderr?.on('data', onData)
+          mediamtxProcess!.on('error', (e) => settle(() => reject(e))())
+          mediamtxProcess!.on('close', (code) => settle(() => reject(new Error(`MediaMTX 进程退出(code ${code})`)))())
         })
-      } catch { clearTimeout(timeout); throw new Error('MediaMTX 启动失败') }
+      } catch (err) {
+        // 启动失败：清理子进程并允许重试，绝不向主进程抛出未捕获异常
+        killProcess(mediamtxProcess, 'MediaMTX')
+        mediamtxProcess = null
+        throw err instanceof Error ? err : new Error('MediaMTX 启动失败')
+      }
     }
     const env = { ...process.env }
     delete env.http_proxy; delete env.https_proxy
@@ -130,10 +157,17 @@ export const ipcMainHandlersInit = (): void => {
       return new Promise((resolve) => {
         const proc = spawn(p, ['--version'], { windowsHide: true })
         let stderr = ''
+        let settled = false
+        const finish = (v: string | null): void => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          resolve(v)
+        }
         proc.stderr?.on('data', (d) => { stderr += d.toString() })
-        proc.on('close', (code) => { resolve(code !== 0 ? (stderr || `exit code ${code}`) : null) })
-        proc.on('error', (err) => resolve(err.message))
-        setTimeout(() => resolve('自检超时'), 5000)
+        proc.on('close', (code) => finish(code !== 0 ? (stderr || `exit code ${code}`) : null))
+        proc.on('error', (err) => finish(err.message))
+        const timer = setTimeout(() => { proc.kill(); finish('自检超时') }, 5000)
       })
     }
 
@@ -171,7 +205,9 @@ export const ipcMainHandlersInit = (): void => {
     }
 
     const publicUrl = await startTunnel()
-    const streamKey = Math.random().toString(36).slice(2, 8).toUpperCase()
+    // 加密级随机密钥（36 进制大写字母数字），避免使用 Math.random
+    const STREAM_KEY_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    const streamKey = Array.from(randomBytes(6), (b) => STREAM_KEY_ALPHABET[b % STREAM_KEY_ALPHABET.length]).join('')
     return { publicUrl, streamKey }
   })
   ipcMain.handle('stopStreaming', async (): Promise<void> => {

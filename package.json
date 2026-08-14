@@ -8,38 +8,40 @@
   },
   "license": "MIT",
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "tools": "node scripts/fetch-tools.mjs",
+    "postinstall": "node scripts/fetch-tools.mjs",
+    "dev": "npm run tools && electron-vite dev",
+    "build": "npm run tools && electron-vite build",
     "start": "electron-vite preview",
     "translations": "typesafe-i18n --no-watch",
     "translations:watch": "typesafe-i18n",
-    "build:win": "electron-vite build && electron-builder --win --publish never",
-    "build:mac": "electron-vite build && electron-builder --mac --publish never",
-    "build:linux": "electron-vite build && electron-builder --linux --publish never"
+    "build:win": "npm run tools && electron-vite build && electron-builder --win --publish never",
+    "build:mac": "npm run tools && electron-vite build && electron-builder --mac --publish never",
+    "build:linux": "npm run tools && electron-vite build && electron-builder --linux --publish never"
   },
   "dependencies": {
-    "@electron-toolkit/preload": "3.0.1",
+    "@electron-toolkit/preload": "3.0.2",
     "@electron-toolkit/utils": "3.0.0",
     "@sweetalert2/theme-bulma": "5.0.18",
     "electron-settings": "4.0.4",
-    "esbuild": "^0.28.0",
-    "hls.js": "^1.6.16",
+    "hls.js": "^1.7.0",
     "obs-websocket-js": "^5.0.8",
-    "sweetalert2": "11.14.5",
+    "sweetalert2": "^11.26.25",
     "typesafe-i18n": "5.26.2"
   },
   "devDependencies": {
     "@fortawesome/fontawesome-free": "6.6.0",
-    "@sveltejs/vite-plugin-svelte": "3.1.2",
+    "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "bulma": "1.0.2",
-    "electron": "^31.0.2",
-    "electron-builder": "^26.8.1",
-    "electron-vite": "^2.3.0",
-    "sharp": "^0.34.5",
-    "svelte": "4.2.19",
-    "svelte-awesome-color-picker": "3.1.4",
-    "to-ico": "^1.1.5",
+    "electron": "43.4.0",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "esbuild": "^0.28.2",
+    "svelte": "^5.56.9",
     "typescript": "^5.5.2",
-    "vite": "^5.3.1"
+    "vite": "^7.3.6"
+  },
+  "overrides": {
+    "crypto-js": "^4.2.0"
   }
 }

@@ -1,5 +1,9 @@
 appId: net.getpcconnect
 productName: PC Connect
+publish:
+  provider: github
+  owner: MondayV
+  repo: screen-share
 directories:
   buildResources: build
   output: release

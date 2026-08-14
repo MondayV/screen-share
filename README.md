@@ -9,9 +9,11 @@
 - 🎨 **多款皮肤**：内置深色和赛博朋克皮肤，一键切换。
 
 ## 📥 安装
-1. 下载最新安装包：从 [GitHub Releases](https://github.com/MondayV/screen-share/releases) 下载 `PCConnect Setup 2.3.0.exe`。
-2. 双击安装，勾选"创建桌面快捷方式"。
-3. 安装完成后，桌面会出现 `PCConnect` 图标。
+1. 从 [GitHub Releases](https://github.com/MondayV/screen-share/releases) 下载最新安装包（如 `pc-connect-2.3.5-setup.exe`）。
+2. 双击安装（安装程序会自动创建桌面快捷方式）。
+3. 安装完成后，桌面会出现 `PC Connect` 图标。
+
+> ⚠️ 应用为单实例运行（同一台电脑只能打开一个窗口），主持人端与观众端需分别在不同设备上使用。
 
 ## 🚀 使用教程
 
@@ -34,6 +36,7 @@
 1. 启动 PCConnect，点击 **"观看"** 选项卡。
 2. 粘贴主持人分享的 **播放链接**，点击 **"观看"** 按钮。
 3. 稍等片刻，应用内将播放共享画面（延迟约 1-5 秒）。
+4. 点击右下角的音量图标可**取消静音**收听共享的音频。
 
 ### OBS 使用注意事项
 - 以管理员身份运行 OBS 可避免部分游戏黑屏或无法捕获的问题。
@@ -46,15 +49,29 @@
 - **网络优化**：在 OBS 的 `设置 -> 高级 -> 网络` 中，勾选"动态调整比特率以应对网络拥堵"，可避免网络波动导致的卡顿。
 
 ### 一键推流（Python 脚本，推荐）
-1. **安装 Python**：如果电脑上没有安装 Python，请从 [python.org](https://python.org) 下载 Python 3.6–3.11 版本（OBS 目前支持的版本）。安装时请勾选 **"Add Python to PATH"**。
-2. **打开脚本文件夹**：在 PCConnect 界面点击 **"📂 打开 OBS 脚本文件夹"**。
-3. **复制脚本**：将文件夹中的 `pc-connect-auto-push.py` 复制到 OBS 的脚本目录：
-   - Windows 路径：`%APPDATA%\obs-studio\scripts`
-4. **在 OBS 中添加脚本**：打开 OBS → **工具 → 脚本** → 点击 **"+"** 号 → 选择刚才复制的 `pc-connect-auto-push.py`。
-5. **开始共享**：在 PCConnect 中点击 **"开始共享"**，然后在 OBS 脚本界面点击 **"开始推流（自动配置）"** 即可推流，无需手动填写密钥。
+1. **打开脚本文件夹**：在 PCConnect 界面点击 **"📂 打开 OBS 脚本文件夹"**，复制其中的 `pc-connect-auto-push.py`。
+2. **放入 OBS 脚本目录**：将脚本复制到 OBS 的脚本目录（Windows 路径：`%APPDATA%\obs-studio\scripts`）。
+3. **在 OBS 中添加脚本**：打开 OBS → **工具 → 脚本** → 点击 **"+"** 号 → 选择刚才复制的 `pc-connect-auto-push.py`。
+4. **开始共享**：在 PCConnect 中点击 **"开始共享"**，然后在 OBS 脚本界面点击 **"开始推流（自动配置）"** 即可推流，无需手动填写密钥。
+
+> 提示：脚本会修改 OBS 的推流服务配置（`rtmp_custom`），再次手动推流前请检查推流设置。
+
+## 🔐 安全与隐私
+- **链接即密钥**：播放链接中携带流密钥，**任何拿到链接的人都能观看你的屏幕**，请仅在可信范围内分享，结束后及时停止推流。
+- **本地优先**：视频流仅在本机 MediaMTX 处理，经 Cloudflare 临时隧道转发；应用无遥测、无账号、不收集任何统计数据。
+- **OBS 密码**：使用操作系统级加密（Windows DPAPI / macOS Keychain）存储。
+- 详细说明见 [隐私政策](PRIVACY.md) 与 [服务条款](TOS.md)。
+
+## 🔧 开发与构建
+```bash
+npm install
+npm run dev        # 开发模式
+npm run build      # 构建产物到 out/
+npm run build:win  # 打包 Windows 安装包
+```
 
 ## 🎨 皮肤切换
 在 PCConnect 设置中，你可以选择 **深色** 或 **赛博朋克** 两款皮肤，一键切换，立刻生效。
 
 ## 📜 开源协议
-MIT License
+MIT License，详见 [LICENSE](LICENSE)。内置第三方组件（MediaMTX、cloudflared、Electron 等）的许可信息见应用"关于"页面及 [resources/tools/README.md](resources/tools/README.md)。

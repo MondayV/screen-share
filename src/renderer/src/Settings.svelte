@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import ColorPicker from 'svelte-awesome-color-picker'
   import { L } from './translations'
   import { theme } from './theme'
 
@@ -14,30 +13,15 @@
   let colorValue: string = '#ffffff'
   let language = 'zh'
   const languageOptions = ['zh']
-  let iceServersValue: string = '{ "urls": "stun:stun.l.google.com:19302" }'
   let isUsernameValid = false
   let isColorValid = false
-  let isIceServersValid = true
   let modalSuccessIsActive = false
   let modalFailureIsActive = false
   let obsPassword = ''
 
   $: colorValue, checkColor()
   $: usernameValue, checkUsername()
-  $: iceServersValue, checkIceServers()
-  $: obsPassword, saveOBSPassword()
 
-  const checkIceServers = (): void => {
-    const serversObjects = iceServersValue.split('\n')
-    isIceServersValid = serversObjects.every((serverObject) => {
-      try {
-        const srv = JSON.parse(serverObject)
-        return srv.urls && srv.urls.length > 0
-      } catch (e) {
-        return false
-      }
-    })
-  }
   const checkIsValidHexColor = (color: string): boolean => {
     return /^#[0-9A-F]{6}$/i.test(color)
   }
@@ -58,14 +42,13 @@
   }
   async function onSubmit(evt: Event): Promise<void> {
     evt.preventDefault()
-    if (isUsernameValid && isColorValid && isIceServersValid) {
+    if (isUsernameValid && isColorValid) {
       await window.PcConnectApi.updateSettings({
         username: usernameValue,
         color: colorValue,
-        language,
-        isMicrophoneEnabledOnConnect: true,
-        iceServers: iceServersValue.split('\n').map((srv) => JSON.parse(srv))
+        language
       })
+      await saveOBSPassword()
       modalSuccessIsActive = true
       setTimeout(() => {
         modalSuccessIsActive = false
@@ -86,7 +69,6 @@
     usernameValue = settings.username
     colorValue = settings.color
     language = settings.language
-    iceServersValue = settings.iceServers.map((srv) => JSON.stringify(srv)).join('\n')
     obsPassword = await window.PcConnectApi.getObsPassword()
   })
 </script>
@@ -144,7 +126,7 @@
         <span class="icon is-small is-left">
           <i bind:this={colorPreviewIcon} class="fas fa-palette"></i>
         </span>
-        <ColorPicker bind:hex={colorValue} isTextInput={false} isAlpha={false} />
+        <input type="color" class="color-input" bind:value={colorValue} aria-label="选择颜色" />
       </div>
     </div>
     <div class="field">
@@ -186,24 +168,11 @@
           type="password"
           id="obs-password"
           bind:value={obsPassword}
+          on:blur={saveOBSPassword}
           placeholder="留空表示无密码"
         />
       </div>
       <p class="help">OBS → 工具 → WebSocket 服务器设置 → 插件设置中勾选开启服务器 → 服务器设置中适配端口生成密码 → 显示连接信息里复制生成的密码</p>
-    </div>
-
-    <h2>{L.advanced()}</h2>
-
-    <div class="field">
-      <label class="label" for="ice_servers">{L.stun_turn_server_objects()}</label>
-      <div class="control has-icons-left has-icons-right">
-        <textarea
-          bind:value={iceServersValue}
-          class="textarea {isIceServersValid ? 'is-success' : 'is-danger'}"
-          id="ice_servers"
-          placeholder="&#123; &quot;urls&quot;: &quot;stun:stun.l.google.com:19302&quot; &#125;"
-        ></textarea>
-      </div>
     </div>
 
     <div class="field">
@@ -218,5 +187,14 @@
   span.icon i.fa-palette:before {
     color: var(--color);
     text-shadow: '-1px 0 black, 0 1px black, 1px 0 black, 0 -1px black';
+  }
+  .color-input {
+    width: 48px;
+    height: 38px;
+    padding: 2px;
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
   }
 </style>

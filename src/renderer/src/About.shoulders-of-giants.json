@@ -21,11 +21,32 @@
     "usage": "UI 样式"
   },
   {
-    "title": "WebRTC",
-    "url": "https://webrtc.org/",
-    "license": "BSD",
-    "description": "浏览器实时通信技术",
-    "usage": "点对点屏幕共享"
+    "title": "MediaMTX",
+    "url": "https://github.com/bluenviron/mediamtx",
+    "license": "MIT",
+    "description": "即用型多协议媒体服务器，支持 RTMP 推流与 HLS 分发",
+    "usage": "本地流媒体服务（内置）"
+  },
+  {
+    "title": "cloudflared",
+    "url": "https://github.com/cloudflare/cloudflared",
+    "license": "Apache-2.0",
+    "description": "Cloudflare 隧道客户端，提供免费公网临时隧道",
+    "usage": "公网播放链接（内置）"
+  },
+  {
+    "title": "hls.js",
+    "url": "https://github.com/video-dev/hls.js",
+    "license": "Apache-2.0",
+    "description": "基于 MSE 的 HLS 播放器库",
+    "usage": "观众端视频播放"
+  },
+  {
+    "title": "OBS WebSocket",
+    "url": "https://github.com/obs-websocket-community-projects/obs-websocket-js",
+    "license": "MIT",
+    "description": "通过 WebSocket 控制 OBS Studio 的 JavaScript 客户端",
+    "usage": "自动控制 OBS 推流"
   },
   {
     "title": "SweetAlert2",
@@ -40,6 +61,13 @@
     "license": "SIL OFL 1.1 / MIT",
     "description": "图标字体和 CSS 框架",
     "usage": "界面图标"
+  },
+  {
+    "title": "electron-settings",
+    "url": "https://github.com/nathanbuchar/electron-settings",
+    "license": "MIT",
+    "description": "Electron 本地配置持久化库",
+    "usage": "设置存储"
   },
   {
     "title": "typesafe-i18n",
