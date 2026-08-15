@@ -1,0 +1,13 @@
+{
+  "appPath": "D:/Edge/PCConnect/PCConnect.exe",
+  "obsPassword": "THhCJWGWJ3SeI5ps",
+  "obsDisplaySource": "显示器采集",
+  "aPort": 9333,
+  "bPort": 9334,
+  "bUserDataDir": "D:/pc-test-viewer",
+  "potPlayerPath": "D:/PotPlayer/PotPlayerMini64.exe",
+  "testVideo": "D:/BaiduNetdiskDownload/奥本海默.mp4",
+  "watchSeconds": 30,
+  "modes": "smooth,smart,clear",
+  "modeBitrates": { "smooth": 1200, "smart": 3000, "clear": 6000 }
+}

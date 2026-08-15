@@ -14,3 +14,7 @@ release/
 resources/tools/*.exe
 resources/tools/*.tmp
 resources/tools/*.d/
+
+# e2e 测试本机配置与报告（模板 config.example.json 入库）
+scripts/e2e-test/config.json
+scripts/e2e-test/reports/

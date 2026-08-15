@@ -73,6 +73,13 @@ npm run build      # 构建产物到 out/
 npm run build:win  # 打包 Windows 安装包
 ```
 
+## 🧪 版本回归测试
+每个版本发布前必须执行标准化回归测试（启动延迟、观看延迟、播放稳定性、三档画质码率）：
+```bash
+node scripts/e2e-test/run-test.mjs
+```
+详见 [scripts/e2e-test/README.md](scripts/e2e-test/README.md)（配置、判定基线）与 [KNOWN-ISSUES.md](scripts/e2e-test/KNOWN-ISSUES.md)（已知问题清单）。
+
 ## 🎨 皮肤切换
 在 PCConnect 设置中，你可以选择 **深色** 或 **赛博朋克** 两款皮肤，一键切换，立刻生效。
 
