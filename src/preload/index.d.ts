@@ -79,7 +79,7 @@ declare global {
       checkObsConnection: () => Promise<ObsConnectionStatus>
       checkPathActive: (key: string) => Promise<PathActiveStatus>
       checkTunnelReachable: (url: string) => Promise<{ ok: boolean; reason: string }>
-      proxyFetch: (method: string, url: string, body?: string, extraHeaders?: Record<string, string>) => Promise<{ status: number; headers: Record<string, string>; body: string }>
+      proxyFetch: (method: string, url: string, body?: string, extraHeaders?: Record<string, string>, binary?: boolean) => Promise<{ status: number; headers: Record<string, string>; body: string }>
 
       // ---- 日志 ----
       onLogMessage: (cb: (msg: string) => void) => () => void

@@ -47,8 +47,9 @@ const resolveViaDoH = async (host: string): Promise<string | null> => {
 }
 
 /** 主进程代理请求：解析域名→IP 直连（Host 头保留域名，绕过系统 DNS 污染）。
- * 返回 { status, headers, body }；headers 为小写键。 */
-const proxyRequest = async (method: string, url: string, body?: string, extraHeaders?: Record<string, string>): Promise<{ status: number; headers: Record<string, string>; body: string }> => {
+ * 返回 { status, headers, body }；headers 为小写键。
+ * binary=true 时 body 为 base64（用于 HLS 媒体分片等二进制内容）。 */
+const proxyRequest = async (method: string, url: string, body?: string, extraHeaders?: Record<string, string>, binary = false): Promise<{ status: number; headers: Record<string, string>; body: string }> => {
   const u = new URL(url)
   const host = u.hostname
   // 解析 IP：本机地址直接使用；否则优先 DoH，其次系统 DNS（dns.lookup 可被污染，仅作兜底）
@@ -66,31 +67,50 @@ const proxyRequest = async (method: string, url: string, body?: string, extraHea
     ...(body !== undefined ? { 'Content-Length': Buffer.byteLength(body).toString() } : {}),
     ...extraHeaders,
   }
-  const result = await new Promise<{ status: number; headers: Record<string, string>; body: string }>((resolve, reject) => {
-    const transport = u.protocol === 'http:' ? require('http') : https
-    const req = transport.request({
-      host: ip,
-      port: u.port || (u.protocol === 'http:' ? 80 : 443),
-      servername: host !== ip ? host : undefined, // IP 直连时无需 SNI
-      path: u.pathname + u.search,
-      method,
-      headers,
-      timeout: 10000,
-      rejectUnauthorized: false, // 隧道证书为 *.trycloudflare.com，IP 直连时跳过主机名校验
-    }, (res: any) => {
-      const chunks: Buffer[] = []
-      res.on('data', (d: Buffer) => chunks.push(d))
-      res.on('end', () => {
-        const h: Record<string, string> = {}
-        for (const [k, v] of Object.entries(res.headers)) h[k.toLowerCase()] = Array.isArray(v) ? v.join(',') : String(v)
-        resolve({ status: res.statusCode, headers: h, body: Buffer.concat(chunks).toString('utf8') })
+
+  // 单次请求（递归用于跟随重定向）
+  const once = (targetUrl: string, cookie = '', hops = 0): Promise<{ status: number; headers: Record<string, string>; body: string }> => {
+    const tu = new URL(targetUrl)
+    const tHost = tu.hostname
+    const finalIp = tHost === '127.0.0.1' || tHost === 'localhost' || tHost === '::1' ? tHost : ip // 重定向到同域时复用已解析 IP
+    const h: Record<string, string> = { ...headers, Host: tu.port && tu.port !== (tu.protocol === 'http:' ? '80' : '443') ? `${tHost}:${tu.port}` : tHost }
+    if (cookie) h['Cookie'] = cookie
+    return new Promise<{ status: number; headers: Record<string, string>; body: string }>((resolve, reject) => {
+      const transport = tu.protocol === 'http:' ? require('http') : https
+      const req = transport.request({
+        host: finalIp,
+        port: tu.port || (tu.protocol === 'http:' ? 80 : 443),
+        servername: tHost !== finalIp ? tHost : undefined,
+        path: tu.pathname + tu.search,
+        method,
+        headers: h,
+        timeout: 10000,
+        rejectUnauthorized: false,
+      }, (res: any) => {
+        const chunks: Buffer[] = []
+        res.on('data', (d: Buffer) => chunks.push(d))
+        res.on('end', () => {
+          const rh: Record<string, string> = {}
+          for (const [k, v] of Object.entries(res.headers)) rh[k.toLowerCase()] = Array.isArray(v) ? v.join(',') : String(v)
+          const buf = Buffer.concat(chunks)
+          // 跟随重定向（MediaMTX cookie 校验 302），最多 3 跳
+          if (hops < 3 && res.statusCode >= 300 && res.statusCode < 400 && rh.location) {
+            const setCookies = res.headers['set-cookie']
+            const nextCookie = Array.isArray(setCookies) ? setCookies.map((c: string) => c.split(';')[0]).join('; ') : ''
+            const nextUrl = new URL(rh.location, targetUrl).toString()
+            once(nextUrl, nextCookie || cookie, hops + 1).then(resolve).catch(reject)
+            return
+          }
+          resolve({ status: res.statusCode, headers: rh, body: binary ? buf.toString('base64') : buf.toString('utf8') })
+        })
       })
+      req.on('timeout', () => { req.destroy(); reject(new Error(`请求超时: ${method} ${tHost}`)) })
+      req.on('error', (e: NodeJS.ErrnoException) => reject(new Error(e.code === 'ENOTFOUND' ? `域名无法解析: ${tHost}` : e.message)))
+      if (body !== undefined) req.write(body)
+      req.end()
     })
-    req.on('timeout', () => { req.destroy(); reject(new Error(`请求超时: ${method} ${host}`)) })
-    req.on('error', (e: NodeJS.ErrnoException) => reject(new Error(e.code === 'ENOTFOUND' ? `域名无法解析: ${host}` : e.message)))
-    if (body !== undefined) req.write(body)
-    req.end()
-  })
+  }
+  const result = await once(url)
   return result
 }
 function getMediaMTXPath(): string {
@@ -627,9 +647,9 @@ export const ipcMainHandlersInit = (): void => {
     }
     return { active: false, reason: '推流未到达（播放列表为空），请确认 OBS 已开始推流' }
   })
-  // 主进程代理 HTTP 请求（DoH 绕过 DNS 污染）：渲染层房间同步/WHEP 信令全部走此通道
-  ipcMain.handle('proxyFetch', async (_e, method: string, url: string, body?: string, extraHeaders?: Record<string, string>) => {
-    return await proxyRequest(method, url, body, extraHeaders)
+  // 主进程代理 HTTP 请求（DoH 绕过 DNS 污染）：渲染层房间同步/WHEP 信令/HLS 播放全部走此通道
+  ipcMain.handle('proxyFetch', async (_e, method: string, url: string, body?: string, extraHeaders?: Record<string, string>, binary = false) => {
+    return await proxyRequest(method, url, body, extraHeaders, binary)
   })
   // 公网隧道可达性：区分"隧道失效(DNS/连接)"与"推流未到(应用层)"两类故障
   // 远端 B 端"启动共享失败"常因 A 端房间隧道域名失效（ERR_NAME_NOT_RESOLVED/530），

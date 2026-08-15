@@ -3,6 +3,7 @@
   import Swal from 'sweetalert2'
   import { useNavigationEnabled } from './stores'
   import { connectToOBS, startStreamWithKey, stopStream, disconnectOBS, getObsFps } from './lib/obs-controller'
+  import { ProxyHlsLoader, proxyHlsConfig } from './lib/proxy-hls-loader'
 
   const navigationEnabled = useNavigationEnabled()
 
@@ -385,9 +386,24 @@
   }
 
   // ---- WHEP 播放（WebRTC P2P）----
-  const whepFetch = async (url: string, method: string, body?: string, headers?: Record<string, string>): Promise<{ status: number; headers: Headers; text: () => Promise<string> }> => {
-    const r = await window.PcConnectApi.proxyFetch(method, url, body, headers)
-    return { status: r.status, headers: new Headers(r.headers), text: async () => r.body }
+  // 信令经 proxyFetch 走 DoH 代理；5xx（隧道抖动 502/530）自动重试 2 次
+  const whepFetch = async (url: string, method: string, body?: string, headers?: Record<string, string>, binary = false): Promise<{ status: number; headers: Headers; text: () => Promise<string> }> => {
+    let last: { status: number; headers: Record<string, string>; body: string } | null = null
+    for (let i = 0; i <= 2; i++) {
+      try {
+        const r = await window.PcConnectApi.proxyFetch(method, url, body, headers, binary)
+        last = r
+        if (r.status >= 500 || r.status === 0) {
+          if (i < 2) { await new Promise((r2) => setTimeout(r2, 1500 * (i + 1))); continue }
+        }
+        return { status: r.status, headers: new Headers(r.headers), text: async () => r.body }
+      } catch (e) {
+        last = null
+        if (i < 2) { await new Promise((r2) => setTimeout(r2, 1500 * (i + 1))); continue }
+        throw e
+      }
+    }
+    throw new Error(`WHEP 请求失败: ${last ? `HTTP ${last.status}` : '网络错误'}`)
   }
 
   const stopWhep = (): void => {
@@ -461,11 +477,8 @@
     if (hls) { hls.destroy(); hls = null }
     const Hls = await getHls()
     if (Hls.isSupported()) {
-      // 低延迟：LL-HLS + 1s 关键帧，贴近直播边缘（目标 behind ~3s）
-      hls = new Hls({
-        lowLatencyMode: true,
-        liveSyncDurationCount: 1
-      })
+      // 低延迟：LL-HLS + 1s 关键帧；自定义 loader 走主进程 DoH 代理（绕过 DNS 污染）
+      hls = new Hls(proxyHlsConfig(Hls) as ConstructorParameters<typeof Hls>[0])
       hls.loadSource(url)
       hls.attachMedia(remoteScreen)
       hls.on(Hls.Events.MANIFEST_PARSED, () => {

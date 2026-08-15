@@ -143,6 +143,24 @@
 - 同机双实例测试中 WHEP 会失败回落 HLS（同机打洞场景特殊），真实异地多机是目标场景
 - 会议隧道本身（房间同步信令）仍走 cloudflared——C 端 DNS 污染已由 DoH 代理绕过，但隧道进程死亡时仍会短暂失联（K8 的进程守护已覆盖）
 
+## K10. v2.7.0 实测暴露：HLS 兜底仍被 DNS 污染卡死 + WHEP 502 隧道抖动
+**状态**: ✅ 已解决（v2.7.1：HLS 代理 loader + WHEP 信令重试）
+
+**现象**（v2.7.0 真实多机测试，2026-08）:
+- C 端 `[播放] WHEP 失败，回落 HLS` → 随后 `GET https://xxx.trycloudflare.com/{key}/index.m3u8` 报 `ERR_NAME_NOT_RESOLVED` → 画面永远出不来
+- C 端 `[播放] WHEP 创建会话失败 (502): error code: 502`（Cloudflare 边缘错误）
+- 共享等待时间长、画面延迟高、频繁卡顿
+
+**根因**:
+1. **HLS 兜底未走 DoH 代理**：v2.7.0 只把房间同步/WHEP 信令改走 `proxyFetch`，但 hls.js 播放器仍在渲染层直接 fetch m3u8/分片——系统 DNS 污染照样拦截 → HLS 兜底完全失效
+2. **WHEP 502**：`error code: 502` 是 Cloudflare 边缘错误页，发生在隧道瞬时抖动/重建窗口期；WHEP 信令无重试，一次失败即回落
+
+**解决（v2.7.1）**:
+1. **hls.js 自定义 Loader（ProxyHlsLoader）**：所有 HLS 请求（m3u8 + 媒体分片）改走主进程 `proxyFetch`（DoH 解析 + IP 直连）——m3u8 与分片均绕过系统 DNS；分片走 base64 二进制通道
+2. **proxyFetch 跟随重定向**：处理 MediaMTX cookie 校验的 302（带 Set-Cookie 循环跟随，最多 3 跳）——否则 m3u8 只拿到 302 空响应
+3. **WHEP 信令自动重试**：`whepFetch` 对 5xx（502/530 隧道抖动）自动重试 2 次（间隔 1.5s/3s）后仍失败才回落 HLS
+4. **验证**：本地确认 m3u8 200 + 分片二进制 5953B 解码正确；WHEP E2E ICE connected 双轨到达
+
 ---
 
 ## 测试结论参考基线（2026-08-15 首次标准化测试, v2.6.0）
