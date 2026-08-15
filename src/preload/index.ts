@@ -44,6 +44,15 @@ const PcConnectApi = {
   stopStreaming: async (): Promise<void> => {
     ipcRenderer.invoke('stopStreaming')
   },
+  warmupMedia: async (): Promise<void> => {
+    ipcRenderer.invoke('warmupMedia')
+  },
+  setQualityMode: async (mode: string): Promise<boolean> => {
+    return await ipcRenderer.invoke('setQualityMode', mode)
+  },
+  getQualityMode: async (): Promise<string> => {
+    return await ipcRenderer.invoke('getQualityMode')
+  },
   createMeeting: async (): Promise<{ roomUrl: string; roomId: string }> => {
     return await ipcRenderer.invoke('createMeeting')
   },

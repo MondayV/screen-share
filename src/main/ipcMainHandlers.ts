@@ -254,6 +254,50 @@ export const ipcMainHandlersInit = (): void => {
     killProcess(mediaTunnel.proc, 'Cloudflared(媒体)'); mediaTunnel.proc = null
     pendingMediaTunnel = null; mediaTunnelUrl = null
   })
+  // 预热：提前启动 MediaMTX（开始共享时复用，缩短等待）
+  ipcMain.handle('warmupMedia', async (): Promise<void> => {
+    await ensureMediamtx()
+  })
+  // 画质档位：改写 OBS 高级模式编码器配置（streamEncoder.json）
+  // bitrate=推流码率；keyint_sec=关键帧间隔(1s)——LL-HLS 分片依赖关键帧，
+  // 间隔过大会导致画面出现慢、延迟高（实测默认 10.5s -> 1s 后 3.6s）
+  const OBS_PROFILE_DIR = path.join(process.env.APPDATA || '', 'obs-studio', 'basic', 'profiles')
+  const QUALITY_MODES: Record<string, number> = { smooth: 1200, smart: 3000, clear: 6000 }
+  ipcMain.handle('setQualityMode', async (_e, mode: string): Promise<boolean> => {
+    const bitrate = QUALITY_MODES[mode]
+    if (!bitrate) return false
+    try {
+      const profileDir = fs.readdirSync(OBS_PROFILE_DIR, { withFileTypes: true })
+        .find((d) => d.isDirectory())?.name
+      if (!profileDir) return false
+      const encoderFile = path.join(OBS_PROFILE_DIR, profileDir, 'streamEncoder.json')
+      if (!fs.existsSync(encoderFile)) return false
+      const cfg = JSON.parse(fs.readFileSync(encoderFile, 'utf-8'))
+      cfg.rate_control = 'CBR'
+      cfg.bitrate = bitrate
+      cfg.keyint_sec = 1
+      fs.writeFileSync(encoderFile, JSON.stringify(cfg), 'utf-8')
+      console.log(`[画质] ${mode} -> ${bitrate}kbps, keyint 1s`)
+      return true
+    } catch (e) {
+      console.error('[画质] 设置失败:', e)
+      return false
+    }
+  })
+  ipcMain.handle('getQualityMode', async (): Promise<string> => {
+    try {
+      const profileDir = fs.readdirSync(OBS_PROFILE_DIR, { withFileTypes: true })
+        .find((d) => d.isDirectory())?.name
+      if (!profileDir) return 'smart'
+      const encoderFile = path.join(OBS_PROFILE_DIR, profileDir, 'streamEncoder.json')
+      if (!fs.existsSync(encoderFile)) return 'smart'
+      const cfg = JSON.parse(fs.readFileSync(encoderFile, 'utf-8'))
+      const bitrate = Number(cfg.bitrate || 0)
+      return bitrate <= 1500 ? 'smooth' : bitrate >= 5000 ? 'clear' : 'smart'
+    } catch {
+      return 'smart'
+    }
+  })
   // 创建会议：确保房间服务运行并为其建立公网隧道，返回会议链接
   ipcMain.handle('createMeeting', async (): Promise<{ roomUrl: string; roomId: string }> => {
     const roomPort = await startRoomServer()

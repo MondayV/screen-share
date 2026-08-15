@@ -42,6 +42,27 @@
   let statusTimer: ReturnType<typeof setInterval> | null = null
   let fpsTimer: ReturnType<typeof setInterval> | null = null
   let currentFps = 0
+  // 画质档位：smooth=流畅优先 / smart=智能 / clear=清晰优先
+  let qualityMode = 'smart'
+  const QUALITY_OPTIONS = [
+    { value: 'smooth', label: '流畅度优先', desc: '低码率，网络差时更稳定' },
+    { value: 'smart', label: '智能（推荐）', desc: '中码率 + 网络自适应' },
+    { value: 'clear', label: '清晰度优先', desc: '高码率，画面更清晰' }
+  ]
+
+  const changeQuality = async (): Promise<void> => {
+    const ok = await window.PcConnectApi.setQualityMode(qualityMode)
+    if (ok) {
+      const label = QUALITY_OPTIONS.find((q) => q.value === qualityMode)?.label || qualityMode
+      Swal.fire({
+        position: 'top-end', icon: 'success', title: `已切换为「${label}」`,
+        text: myShareId ? '正在共享中，新画质将在下次开始共享时生效' : '将在开始共享时生效',
+        showConfirmButton: false, timer: 2500
+      })
+    } else {
+      Swal.fire({ position: 'top-end', icon: 'error', title: '画质设置失败', showConfirmButton: false, timer: 2500 })
+    }
+  }
 
   // ---------- 播放器状态 ----------
   let remoteScreen: HTMLVideoElement
@@ -62,6 +83,7 @@
       const s = await window.PcConnectApi.getSettings()
       myName = s.username || '我'
     } catch { myName = '我' }
+    try { qualityMode = await window.PcConnectApi.getQualityMode() } catch {}
     // 窗口恢复可见时续播（电量策略可能在后台暂停了视频）
     document.addEventListener('visibilitychange', onVisibilityChange)
   })
@@ -151,6 +173,9 @@
       amCreator = true
       meetingLink = roomUrl
       enterMeeting(roomUrl)
+      // 预热：提前启动 MediaMTX 并连接 OBS，缩短"开始共享"等待
+      void window.PcConnectApi.warmupMedia().catch(() => {})
+      void connectToOBS().catch(() => {})
       await navigator.clipboard.writeText(roomUrl).catch(() => {})
       Swal.close()
       Swal.fire({ position: 'top-end', icon: 'success', title: '会议已创建，链接已复制', showConfirmButton: false, timer: 2500 })
@@ -311,10 +336,10 @@
     if (!isRetry) { playbackRetries = 0; clearPlaybackRetry(); playRetryCount = 0 }
     const Hls = await getHls()
     if (Hls.isSupported()) {
-      // 低延迟：LL-HLS 下贴近直播边缘（目标 behind ~2-3s）
+      // 低延迟：LL-HLS + 1s 关键帧，贴近直播边缘（目标 behind ~3s）
       hls = new Hls({
         lowLatencyMode: true,
-        liveSyncDurationCount: 2
+        liveSyncDurationCount: 1
       })
       hls.loadSource(url)
       hls.attachMedia(remoteScreen)
@@ -448,6 +473,19 @@
 
         <div class="box">
           <h2 class="title is-6 mb-2">我的共享</h2>
+          <div class="field">
+            <label class="label" style="font-size:0.8rem;">画质（推流码率）</label>
+            <div class="control">
+              <div class="select is-fullwidth">
+                <select bind:value={qualityMode} on:change={changeQuality}>
+                  {#each QUALITY_OPTIONS as opt}
+                    <option value={opt.value}>{opt.label}</option>
+                  {/each}
+                </select>
+              </div>
+            </div>
+            <p class="help">{QUALITY_OPTIONS.find((q) => q.value === qualityMode)?.desc}</p>
+          </div>
           {#if myShareId}
             <p class="mb-2">
               <span class="tag is-success">正在共享</span>

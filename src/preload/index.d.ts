@@ -55,6 +55,9 @@ declare global {
       startStreaming: () => Promise<StreamResult>
       getStreamUrl: () => Promise<string>
       stopStreaming: () => Promise<void>
+      warmupMedia: () => Promise<void>
+      setQualityMode: (mode: string) => Promise<boolean>
+      getQualityMode: () => Promise<string>
 
       // ---- 会议 ----
       createMeeting: () => Promise<{ roomUrl: string; roomId: string }>
