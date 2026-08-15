@@ -96,6 +96,55 @@
 
 ---
 
+## K8. 多机测试：远端点击"开始共享"失败 + 多域名 ERR_NAME_NOT_RESOLVED / 530
+**状态**: ✅ 已解决（v2.6.1：隧道复用 + 进程守护 + 域名预检 + 错误分类）
+
+**现象**（真实多机测试，2026-08）:
+- 远端测试机点击"开始共享"→ 提示"启动共享失败请重试"，控制台 `GET https://xxx.trycloudflare.com/api/room net::ERR_NAME_NOT_RESOLVED`
+- 主机端（创建者）控制台累积多个不同 trycloudflare 域名报错：`ERR_NAME_NOT_RESOLVED`（DNS 解析失败）、`530`（隧道离线）、HLS 片段 404
+
+**根因**:
+1. **隧道域名是"易失"的**：trycloudflare quick tunnel 的随机域名在隧道进程退出/重建后，Cloudflare 会删除其 DNS 记录，所有客户端（含创建者自己）都会 `ERR_NAME_NOT_RESOLVED`。
+2. **代码反复杀隧道**：旧版 `startCloudflaredTunnel` 每次调用都先 kill 旧隧道再启新隧道——创建者多次创建会议/多次开始共享时，旧域名全部作废，而参会者仍持有旧域名 → 房间同步（/api/room）与共享注册（/api/share）全部失败 → 远端点击开始共享时注册请求打向已失效域名 → "启动共享失败请重试"。
+3. **无错误区分**：注册失败统一提示"启动共享失败请重试"，用户无法判断是"会议服务器不可达"还是"推流问题"。
+
+**解决**（v2.6.1）:
+- **隧道复用**：`startCloudflaredTunnel` 在持有进程存活且有缓存 URL 时直接复用，不再反复 kill 重建 → 避免旧域名失效
+- **进程守护**：cloudflared 意外退出时自动重建隧道（域名会变化，通过日志通知）
+- **域名可达性预检**：隧道建立后验证公网域名可解析/可访问，未通过自动重试
+- **错误分类**：`checkTunnelReachable` 区分"域名无法解析（隧道已失效）"与"隧道离线"；渲染层 `startShare` 注册失败时诊断会议服务器可达性，明确提示"无法连接会议服务器，请确认主持人在线"
+- **roomApi 超时**：所有房间 API 调用加 8s 超时，避免 DNS 解析失败长时间挂起
+
+**注意事项**: quick tunnel 域名每次重建都会变化——若创建者隧道确实死亡重建，参会者需主持人重新分享新链接。彻底解决需固定域名（需 Cloudflare 账号命名隧道），暂不在路线图内。
+
+---
+
+## K9. 中国大陆多机异地场景：Cloudflare 隧道连通性差（B 不稳定 / C 完全无法连接）
+**状态**: ✅ 已解决（v2.7.0：WebRTC P2P 直连 + DoH 代理 + 房间服务 WHEP 代理）
+
+**现象**（真实多机测试，2026-08，A/B/C 全在中国大陆、异地不同宽带）:
+- **B 端**：能连接但画面卡顿/频繁缓冲
+- **C 端**：`GET https://major-virgin-bedford-invoice.trycloudflare.com/api/room` 与 `lists-became-olympus-obtained.trycloudflare.com/api/room` 均 `ERR_NAME_NOT_RESOLVED`；点击"开始共享"→ `roomApi` `TypeError: Failed to fetch` → "启动共享失败请重试"
+
+**根因**:
+1. **大陆网络访问 Cloudflare 随机域名（`xxx.trycloudflare.com`）DNS 解析极不稳定**：Cloudflare 的 DNS 在中国大陆常被污染/干扰，quick tunnel 每次新建的随机子域名解析失败率很高 → C 端 `ERR_NAME_NOT_RESOLVED`
+2. **大陆 ↔ Cloudflare 边缘节点国际链路质量差**：即使连通，延迟高、丢包多 → B 端画面卡顿/频繁缓冲
+3. `roomApi` 注册请求依赖创建者 A 的隧道域名可达，域名解析失败 → 共享注册失败
+
+**解决（v2.7.0，方案 A：WebRTC P2P 直连）**:
+1. **媒体流 P2P 打洞**：MediaMTX 开启 WebRTC 输出（`webrtc: true` + 国内 STUN：stun.qq.com / stun.miwifi.com / stun.l.google.com）；观看端用原生 RTCPeerConnection + WHEP 协议与共享端 **UDP 直连**，媒体流不再经过 Cloudflare——根治 B 端卡顿与 C 端 DNS 解析失败
+2. **信令 DoH 代理**：渲染层所有房间请求（同步/注册/WHEP 信令）改走主进程 `proxyFetch`：主进程用 DoH（223.5.5.5 / 1.1.1.1 / 8.8.8.8）解析隧道域名拿真实 IP 直连，绕过大陆系统 DNS 污染
+3. **房间服务 WHEP 代理**：`/api/whep/{key}/whep` 透传到本地 MediaMTX 8889（复用房间隧道，无需新隧道），重写 Location 头保持代理路径
+4. **HLS 兜底**：WHEP 打洞失败/连接断开自动回落 HLS（streamUrl 恒为 HLS，向后兼容老版本观看端）
+5. **验证**：本地 E2E 确认 OPTIONS→POST→PATCH→ICE connected→双轨到达；向后兼容（2.6.1 老版观看端走 HLS 正常）
+
+**已知限制**:
+- WebRTC 打洞在严格对称 NAT 下可能失败（~10-20%），此时自动回落 HLS
+- 同机双实例测试中 WHEP 会失败回落 HLS（同机打洞场景特殊），真实异地多机是目标场景
+- 会议隧道本身（房间同步信令）仍走 cloudflared——C 端 DNS 污染已由 DoH 代理绕过，但隧道进程死亡时仍会短暂失联（K8 的进程守护已覆盖）
+
+---
+
 ## 测试结论参考基线（2026-08-15 首次标准化测试, v2.6.0）
 
 | 档位 | 流到达 | B画面 | behind均值 | 停滞 | 实际码率 |

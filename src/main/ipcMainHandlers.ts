@@ -8,6 +8,91 @@ import fs from 'fs'
 import path from 'path'
 import { startRoomServer, getRoomInfo } from './roomServer'
 
+// ================= 大陆网络 DNS 污染绕过（DoH 代理） =================
+// trycloudflare 随机域名在国内常被 DNS 污染导致 ERR_NAME_NOT_RESOLVED（K9），
+// 渲染层所有指向公网隧道的请求（房间同步/共享注册/WHEP 信令）改由主进程代理：
+// 用 DoH(223.5.5.5 阿里/1.1.1.1) 解析出真实 IP 后直连，绕过系统 DNS 污染。
+const https = require('https')
+
+/** 通过 DoH 解析域名（多服务器轮询），返回 IP；失败返回 null */
+const resolveViaDoH = async (host: string): Promise<string | null> => {
+  const dohServers = [
+    { host: '223.5.5.5', path: `/resolve?name=${encodeURIComponent(host)}&type=A&ct=application/dns-json` }, // 阿里
+    { host: '1.1.1.1', path: `/dns-query?name=${encodeURIComponent(host)}&type=A` },                       // Cloudflare
+    { host: '8.8.8.8', path: `/resolve?name=${encodeURIComponent(host)}&type=A` },                         // Google
+  ]
+  for (const s of dohServers) {
+    try {
+      const ip = await new Promise<string | null>((resolve) => {
+        const req = https.request({ host: s.host, path: s.path, method: 'GET', timeout: 5000 }, (res: any) => {
+          let body = ''
+          res.on('data', (d: Buffer) => { body += d.toString() })
+          res.on('end', () => {
+            try {
+              const data = JSON.parse(body)
+              const answers = data.Answer || []
+              const a = answers.find((x: any) => x.type === 1 && x.data)
+              resolve(a ? a.data : null)
+            } catch { resolve(null) }
+          })
+        })
+        req.on('timeout', () => { req.destroy(); resolve(null) })
+        req.on('error', () => resolve(null))
+        req.end()
+      })
+      if (ip) return ip
+    } catch {}
+  }
+  return null
+}
+
+/** 主进程代理请求：解析域名→IP 直连（Host 头保留域名，绕过系统 DNS 污染）。
+ * 返回 { status, headers, body }；headers 为小写键。 */
+const proxyRequest = async (method: string, url: string, body?: string, extraHeaders?: Record<string, string>): Promise<{ status: number; headers: Record<string, string>; body: string }> => {
+  const u = new URL(url)
+  const host = u.hostname
+  // 解析 IP：本机地址直接使用；否则优先 DoH，其次系统 DNS（dns.lookup 可被污染，仅作兜底）
+  let ip = host
+  if (host !== '127.0.0.1' && host !== 'localhost' && host !== '::1') {
+    ip = await resolveViaDoH(host)
+    if (!ip) {
+      const dns = require('dns')
+      ip = await new Promise((resolve) => dns.lookup(host, (err: Error | null, addr: string) => resolve(err ? '' : addr)))
+    }
+    if (!ip) throw new Error(`域名解析失败: ${host}`)
+  }
+  const headers: Record<string, string> = {
+    Host: u.port && ((u.protocol === 'http:' && u.port !== '80') || (u.protocol === 'https:' && u.port !== '443')) ? `${host}:${u.port}` : host,
+    ...(body !== undefined ? { 'Content-Length': Buffer.byteLength(body).toString() } : {}),
+    ...extraHeaders,
+  }
+  const result = await new Promise<{ status: number; headers: Record<string, string>; body: string }>((resolve, reject) => {
+    const transport = u.protocol === 'http:' ? require('http') : https
+    const req = transport.request({
+      host: ip,
+      port: u.port || (u.protocol === 'http:' ? 80 : 443),
+      servername: host !== ip ? host : undefined, // IP 直连时无需 SNI
+      path: u.pathname + u.search,
+      method,
+      headers,
+      timeout: 10000,
+      rejectUnauthorized: false, // 隧道证书为 *.trycloudflare.com，IP 直连时跳过主机名校验
+    }, (res: any) => {
+      const chunks: Buffer[] = []
+      res.on('data', (d: Buffer) => chunks.push(d))
+      res.on('end', () => {
+        const h: Record<string, string> = {}
+        for (const [k, v] of Object.entries(res.headers)) h[k.toLowerCase()] = Array.isArray(v) ? v.join(',') : String(v)
+        resolve({ status: res.statusCode, headers: h, body: Buffer.concat(chunks).toString('utf8') })
+      })
+    })
+    req.on('timeout', () => { req.destroy(); reject(new Error(`请求超时: ${method} ${host}`)) })
+    req.on('error', (e: NodeJS.ErrnoException) => reject(new Error(e.code === 'ENOTFOUND' ? `域名无法解析: ${host}` : e.message)))
+    if (body !== undefined) req.write(body)
+    req.end()
+  })
+  return result
+}
 function getMediaMTXPath(): string {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, 'tools', 'mediamtx.exe')
@@ -40,8 +125,9 @@ function getCloudflaredPath(): string {
 
 let mediamtxProcess: ChildProcess | null = null
 // 两个 cloudflared 隧道：媒体(8888→HLS) 与 房间服务(房间端口)
-const mediaTunnel = { proc: null as ChildProcess | null }
-const roomTunnel = { proc: null as ChildProcess | null }
+// url 缓存当前公网地址，进程存活时复用，避免反复 kill 重建导致域名失效
+const mediaTunnel = { proc: null as ChildProcess | null, url: null as string | null }
+const roomTunnel = { proc: null as ChildProcess | null, url: null as string | null }
 
 function sendLog(msg: string): void {
   const wins = BrowserWindow.getAllWindows()
@@ -64,8 +150,8 @@ function killProcess(p: ChildProcess | null, name: string): void {
 
 export function stopAllProcesses(): void {
   killProcess(mediamtxProcess, 'MediaMTX'); mediamtxProcess = null
-  killProcess(mediaTunnel.proc, 'Cloudflared(媒体)'); mediaTunnel.proc = null
-  killProcess(roomTunnel.proc, 'Cloudflared(房间)'); roomTunnel.proc = null
+  killProcess(mediaTunnel.proc, 'Cloudflared(媒体)'); mediaTunnel.proc = null; mediaTunnel.url = null
+  killProcess(roomTunnel.proc, 'Cloudflared(房间)'); roomTunnel.proc = null; roomTunnel.url = null
 }
 
 const noProxyEnv = (): NodeJS.ProcessEnv => {
@@ -93,8 +179,12 @@ const checkCloudflared = (p: string): Promise<string | null> => {
   })
 }
 
-/** 启动一个 cloudflared 快速隧道，映射到本地端口，返回公网 https URL */
-const startCloudflaredTunnel = async (localPort: number, holder: { proc: ChildProcess | null }): Promise<string> => {
+/** 启动一个 cloudflared 快速隧道，映射到本地端口，返回公网 https URL。
+ *  - 复用：若 holder 已有存活隧道（进程在、URL 已记录），直接返回缓存 URL，避免反复 kill 重建
+ *    导致旧域名 DNS 记录被移除、参会者全部失联（曾出现 ERR_NAME_NOT_RESOLVED 故障）
+ *  - 守护：进程意外退出时自动重建（quick tunnel 域名每次变化，重建后通过 log 通知）
+ */
+const startCloudflaredTunnel = async (localPort: number, holder: { proc: ChildProcess | null; url: string | null }): Promise<string> => {
   const cfPath = getCloudflaredPath()
   console.log('[Cloudflared] 使用路径:', cfPath)
   const checkErr = await checkCloudflared(cfPath)
@@ -108,27 +198,82 @@ const startCloudflaredTunnel = async (localPort: number, holder: { proc: ChildPr
     throw new Error(`Cloudflared 组件异常: ${checkErr}`)
   }
 
+  // 复用：进程存活且已有 URL
+  if (holder.proc && !holder.proc.killed && holder.url) {
+    console.log('[Cloudflared] 复用现有隧道:', holder.url)
+    return holder.url
+  }
+
   const spawnTunnel = (): Promise<string> => {
     if (holder.proc) { killProcess(holder.proc, 'Cloudflared(旧隧道)'); holder.proc = null }
-    holder.proc = spawn(cfPath, ['tunnel', '--url', `http://localhost:${localPort}`, '--protocol', 'http2', '--no-autoupdate'], { env: noProxyEnv(), windowsHide: true })
-    holder.proc.stderr?.on('data', (d) => { const m = d.toString().trim(); if (m) { console.log('[Cloudflared]', m); sendLog(`[Cloudflared] ${m}`) } })
-    holder.proc.stdout?.on('data', (d) => { const m = d.toString().trim(); if (m) { console.log('[Cloudflared]', m); sendLog(`[Cloudflared] ${m}`) } })
+    holder.url = null
+    const proc = spawn(cfPath, ['tunnel', '--url', `http://localhost:${localPort}`, '--protocol', 'http2', '--no-autoupdate'], { env: noProxyEnv(), windowsHide: true })
+    holder.proc = proc
+    proc.stderr?.on('data', (d) => { const m = d.toString().trim(); if (m) { console.log('[Cloudflared]', m); sendLog(`[Cloudflared] ${m}`) } })
+    proc.stdout?.on('data', (d) => { const m = d.toString().trim(); if (m) { console.log('[Cloudflared]', m); sendLog(`[Cloudflared] ${m}`) } })
+    // 进程守护：意外退出（非主动 kill）时自动重建
+    proc.on('exit', (code, signal) => {
+      if (!proc.killed && holder.proc === proc) {
+        holder.proc = null
+        holder.url = null
+        const reason = signal ? `signal ${signal}` : `code ${code}`
+        console.warn(`[Cloudflared] 隧道进程意外退出(${reason})，将自动重建`)
+        sendLog('[Cloudflared] 隧道连接中断，正在自动重建...')
+        setTimeout(() => {
+          if (!holder.proc && !holder.url) {
+            spawnTunnel().then((url) => {
+              holder.url = url
+              sendLog(`[Cloudflared] 隧道已重建: ${url}（域名已变化，如需共享请重新开始共享）`)
+            }).catch((e) => sendLog(`[Cloudflared] 隧道重建失败: ${e.message}`))
+          }
+        }, 3000)
+      }
+    })
     return new Promise<string>((resolve, reject) => {
       const done = (url: string) => { clearTimeout(timer); resolve(url) }
       const fail = (err: Error) => { clearTimeout(timer); reject(err) }
+      let resolved = false
       const check = (data: string) => {
         const m = data.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/)
-        if (m) { sendLog(`[Cloudflared] 隧道已建立: ${m[0]}`); done(m[0]) }
+        if (m && !resolved) { resolved = true; sendLog(`[Cloudflared] 隧道已建立: ${m[0]}`); done(m[0]) }
       }
-      holder.proc!.stderr?.on('data', (d) => check(d.toString()))
-      holder.proc!.stdout?.on('data', (d) => check(d.toString()))
-      holder.proc!.on('error', (e) => fail(e))
-      holder.proc!.on('close', (code) => fail(new Error(`Cloudflared 进程退出(code ${code})`)))
+      proc.stderr?.on('data', (d) => check(d.toString()))
+      proc.stdout?.on('data', (d) => check(d.toString()))
+      proc.on('error', (e) => fail(e))
+      proc.on('close', (code) => { if (!resolved) fail(new Error(`Cloudflared 进程退出(code ${code})`)) })
       const timer = setTimeout(() => { fail(new Error('Cloudflared 隧道启动超时')) }, 90000)
     })
   }
 
-  return await spawnTunnel()
+  const url = await spawnTunnel()
+  holder.url = url
+  // DNS 可达性预检：域名刚注册时本机 DNS 可能尚未生效，等待并确认可解析/可访问
+  await verifyTunnelReachable(url, 3)
+  return url
+}
+
+/** 验证隧道公网域名可访问（DNS 解析 + HTTPS GET），失败重试 */
+const verifyTunnelReachable = async (url: string, attempts = 3): Promise<void> => {
+  const { host } = new URL(url)
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const req = require('https').request({ host, path: '/', method: 'GET', timeout: 10000 }, (res: any) => {
+          res.resume()
+          // 2xx/3xx/4xx 均视为可达（4xx 是应用层响应，说明隧道已连通）
+          resolve()
+        })
+        req.on('timeout', () => { req.destroy(); reject(new Error('timeout')) })
+        req.on('error', reject)
+        req.end()
+      })
+      console.log(`[Cloudflared] 隧道可达性验证通过: ${url}`)
+      return
+    } catch (e) {
+      if (i < attempts - 1) await new Promise((r) => setTimeout(r, 3000))
+      else console.warn(`[Cloudflared] 隧道可达性验证未通过: ${(e as Error).message}（可能需数秒后生效）`)
+    }
+  }
 }
 
 export const ipcMainHandlersInit = (): void => {
@@ -234,6 +379,7 @@ export const ipcMainHandlersInit = (): void => {
   ipcMain.handle('startStreaming', async (): Promise<{ streamKey: string }> => {
     await ensureMediamtx()
     const streamKey = genStreamKey()
+    // 复用已建隧道（进程存活时 startCloudflaredTunnel 直接返回缓存 URL）
     if (!pendingMediaTunnel) {
       pendingMediaTunnel = startCloudflaredTunnel(8888, mediaTunnel)
       pendingMediaTunnel
@@ -253,6 +399,7 @@ export const ipcMainHandlersInit = (): void => {
     killProcess(mediamtxProcess, 'MediaMTX'); mediamtxProcess = null
     killProcess(mediaTunnel.proc, 'Cloudflared(媒体)'); mediaTunnel.proc = null
     pendingMediaTunnel = null; mediaTunnelUrl = null
+    mediaTunnel.url = null
   })
   // 预热：提前启动 MediaMTX（开始共享时复用，缩短等待）
   ipcMain.handle('warmupMedia', async (): Promise<void> => {
@@ -308,6 +455,7 @@ export const ipcMainHandlersInit = (): void => {
   // 结束会议（仅房间创建者）：关闭房间隧道（媒体/共享由各自 stopShare 处理）
   ipcMain.handle('stopMeeting', async (): Promise<void> => {
     killProcess(roomTunnel.proc, 'Cloudflared(房间)'); roomTunnel.proc = null
+    roomTunnel.url = null
   })
   ipcMain.handle('write-push-config', async (_event, data: { server: string; key: string }) => {
     const obsAppDataDir = path.join(process.env.APPDATA || '', 'obs-studio')
@@ -414,8 +562,7 @@ export const ipcMainHandlersInit = (): void => {
     })
   }
 
-  ipcMain.handle('checkObsConnection', async () => {
-    const net = require('net')
+  ipcMain.handle('checkObsConnection', async () => {    const net = require('net')
     const tcpUp = await new Promise<boolean>((resolve) => {
       const s = net.createConnection({ host: '127.0.0.1', port: 4455 })
       s.setTimeout(3000)
@@ -479,5 +626,32 @@ export const ipcMainHandlersInit = (): void => {
       return { active: true, reason: '' }
     }
     return { active: false, reason: '推流未到达（播放列表为空），请确认 OBS 已开始推流' }
+  })
+  // 主进程代理 HTTP 请求（DoH 绕过 DNS 污染）：渲染层房间同步/WHEP 信令全部走此通道
+  ipcMain.handle('proxyFetch', async (_e, method: string, url: string, body?: string, extraHeaders?: Record<string, string>) => {
+    return await proxyRequest(method, url, body, extraHeaders)
+  })
+  // 公网隧道可达性：区分"隧道失效(DNS/连接)"与"推流未到(应用层)"两类故障
+  // 远端 B 端"启动共享失败"常因 A 端房间隧道域名失效（ERR_NAME_NOT_RESOLVED/530），
+  // 渲染层在报错前可借此给出明确指引
+  ipcMain.handle('checkTunnelReachable', async (_e, url: string) => {
+    try {
+      const u = new URL(url)
+      await new Promise<void>((resolve, reject) => {
+        const req = require('https').request({ host: u.host, path: u.pathname || '/', method: 'GET', timeout: 8000 }, (res: any) => {
+          res.resume()
+          resolve()
+        })
+        req.on('timeout', () => { req.destroy(); reject(new Error('连接超时')) })
+        req.on('error', (err: NodeJS.ErrnoException) => {
+          // ENOTFOUND = DNS 解析失败（隧道域名已失效）；ECONNREFUSED = 隧道离线
+          reject(new Error(err.code === 'ENOTFOUND' ? '域名无法解析（隧道已失效）' : err.code === 'ECONNREFUSED' ? '隧道离线' : err.message))
+        })
+        req.end()
+      })
+      return { ok: true, reason: '' }
+    } catch (e) {
+      return { ok: false, reason: (e as Error).message }
+    }
   })
 }

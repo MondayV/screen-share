@@ -74,6 +74,12 @@ const PcConnectApi = {
   checkPathActive: async (key: string): Promise<{ active: boolean; reason: string }> => {
     return await ipcRenderer.invoke('checkPathActive', key)
   },
+  checkTunnelReachable: async (url: string): Promise<{ ok: boolean; reason: string }> => {
+    return await ipcRenderer.invoke('checkTunnelReachable', url)
+  },
+  proxyFetch: async (method: string, url: string, body?: string, extraHeaders?: Record<string, string>): Promise<{ status: number; headers: Record<string, string>; body: string }> => {
+    return await ipcRenderer.invoke('proxyFetch', method, url, body, extraHeaders)
+  },
   onLogMessage: (cb: (msg: string) => void): (() => void) => {
     const handler = (_: any, msg: string) => cb(msg)
     ipcRenderer.on('log-message', handler)
